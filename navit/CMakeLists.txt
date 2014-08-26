@@ -120,6 +120,8 @@ find_package(DBusGLib)
 find_package(PythonLibs)
 find_package(OpenSSL)
 find_package(Threads)
+find_package(Gettext)
+find_package(libspotify REQUIRED)
 libfind_pkg_check_modules(FONTCONFIG fontconfig)
 #Qt detection
 if (NOT DISABLE_QT)
@@ -332,6 +334,10 @@ if (GYPSY_FOUND)
    set_with_reason(vehicle/gypsy "gypsy lib found" TRUE)
 endif(GYPSY_FOUND)
 
+if (libspotify_FOUND)
+   set_with_reason(plugin/spotify "libspotify found" TRUE)
+endif(libspotify_FOUND)
+
 if (LIBGARMIN_FOUND)
    include_directories(${LIBGARMIN_INCLUDE_DIRS})
    set_with_reason(map/garmin "Garmin library found" TRUE ${LIBGARMIN_LDFLAGS})
@@ -394,6 +400,7 @@ add_module(map/csv "Default" TRUE)
 
 #Modules without test yet
 add_module(plugin/pedestrian "Default" FALSE)
+add_module(plugin/spotify "Default" TRUE)
 add_module(speech/android "Default" FALSE)
 add_module(speech/espeak "Default" FALSE)
 add_module(speech/iphone "Default" FALSE)
