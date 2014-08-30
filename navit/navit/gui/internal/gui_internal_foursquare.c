@@ -16,105 +16,15 @@
 #include "gui_internal_widget.h"
 #include "gui_internal_priv.h"
 #include "gui_internal_foursquare.h"
+#include "network.h"
 
 #include "jansson.h"
-#include "curl/curl.h"
-#include "unistd.h"
 
-struct string
-{
-  char *ptr;
-  size_t len;
-};
-
+char *api_version = "20131016";
+char *api_url = "https://api.foursquare.com/v2/checkins/add";
 char *client_id = "";
 char *client_secret = "";
-char *api_version = "20131016";
 char *oauth_token = "";
-char *api_url = "https://api.foursquare.com/v2/checkins/add";
-
-void
-init_string (struct string *s)
-{
-  s->len = 0;
-  s->ptr = malloc (s->len + 1);
-  if (s->ptr == NULL)
-    {
-      dbg(0, "malloc() failed\n");
-    }
-  s->ptr[0] = '\0';
-}
-
-size_t
-writefunc (void *ptr, size_t size, size_t nmemb, struct string *s)
-{
-  size_t new_len = s->len + size * nmemb;
-  s->ptr = realloc (s->ptr, new_len + 1);
-  if (s->ptr == NULL)
-    {
-      dbg (0, "realloc() failed\n");
-    }
-  memcpy (s->ptr + s->len, ptr, size * nmemb);
-  s->ptr[new_len] = '\0';
-  s->len = new_len;
-
-  return size * nmemb;
-}
-
-size_t
-write_data (void *ptr, size_t size, size_t nmemb, FILE * stream)
-{
-  size_t written = fwrite (ptr, size, nmemb, stream);
-  return written;
-}
-
-int
-download_icon (char *prefix, char *img_size, char *suffix)
-{
-  CURL *curl;
-  FILE *fp;
-  CURLcode res;
-  strcat (prefix, img_size);
-  char filename[512];
-
-  static char *navit_sharedir;
-  navit_sharedir = getenv ("NAVIT_SHAREDIR");
-
-  // FIXME : use g_strdup_printf more widely
-
-  strcpy (filename, g_strdup_printf ("%s/xpm/", navit_sharedir));
-  strcat (filename, strrchr (prefix, '/') + 1);
-
-  strcat (filename, "_");
-  strcat (filename, img_size);
-  strcat (filename, suffix);
-
-  char icon_url[512];
-  strcpy (icon_url, prefix);
-  strcat (icon_url, suffix);
-
-  dbg (0, "About to download %s to %s\n", icon_url, filename);
-  // FIXME : switch to navit's code to check for icon presence
-  if (access (filename, F_OK) != -1)
-    {
-      dbg (0, "We have %s in cache already, skipping download\n", filename);
-    }
-  else
-    {
-      curl = curl_easy_init ();
-      if (curl)
-	{
-	  fp = fopen (filename, "wb");
-	  curl_easy_setopt (curl, CURLOPT_URL, icon_url);
-	  curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, write_data);
-	  curl_easy_setopt (curl, CURLOPT_WRITEDATA, fp);
-	  res = curl_easy_perform (curl);
-	  curl_easy_cleanup (curl);
-	  fclose (fp);
-	}
-    }
-  return 0;
-}
 
 static void
 foursquare_set_destination (struct gui_priv *this, struct widget *wm,
@@ -154,28 +64,15 @@ foursquare_checkin (struct gui_priv *this, struct widget *wm, void *data)
   dbg (0, "Url is [%s]\n", url);
   dbg (0, "Try with [ wget --post-data='%s' '%s' ]\n", url, api_url);
 
-  struct string s;
-  init_string (&s);
-  CURL *curl;
-  curl_global_init (CURL_GLOBAL_ALL);
-  curl = curl_easy_init ();
-  curl_easy_setopt (curl, CURLOPT_VERBOSE, 1);
-  curl_easy_setopt (curl, CURLOPT_URL, api_url);
-  curl_easy_setopt (curl, CURLOPT_POST, 1);
-  curl_easy_setopt (curl, CURLOPT_POSTFIELDS, url);
-  curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, writefunc);
-  curl_easy_setopt (curl, CURLOPT_WRITEDATA, &s);
-  curl_easy_perform (curl);
-
-  printf ("%s\n", s.ptr);
+  char * js=post_to_string(api_url);
+  printf ("%s\n", js);
   // FIXME : actually parse the resultcode
   int resultcode = 200;
   dbg (0, "Meta code is %i\n", resultcode);
 
   wb = gui_internal_menu (this, "Check-in result");
 
-  w =
-    gui_internal_box_new (this,
+  w = gui_internal_box_new (this,
 			  gravity_top_center | orientation_vertical |
 			  flags_expand | flags_fill);
   gui_internal_widget_append (wb, w);
@@ -200,9 +97,6 @@ foursquare_checkin (struct gui_priv *this, struct widget *wm, void *data)
   wc->prefix = g_strdup (wm->prefix);
 
   gui_internal_menu_render (this);
-
-  free (s.ptr);
-  curl_easy_cleanup (curl);
 }
 
 void
@@ -321,23 +215,9 @@ gui_internal_cmd_pois_filter_do(struct gui_priv *this, struct widget *wm, void *
   char lng_string[50];
   snprintf (lng_string, 50, "%f", g.lng);
 
-  strcpy (url, baseurl);
-  strcat (url, lat_string);
-  strcat (url, ",");
-  strcat (url, lng_string);
-  strcat (url, "&radius=");
-  strcat (url, radius_string);
-  strcat (url, "&client_id=");
-  strcat (url, client_id);
-  strcat (url, "&client_secret=");
-  strcat (url, client_secret);
-  strcat (url, "&v=");
-  strcat (url, api_version);
-  strcat (url, "&query=");
-  strcat (url, w->text);
+  strcpy (url, g_strdup_printf ("%s%s,%s&radius=%s&client_id=%s&client_secret=%s&v=%s&query=%s",  baseurl, lat_string, lng_string, radius_string, client_id, client_secret, api_version, w->text));
 
-  char *js = json_fetch (url);
-
+  char * js=fetch_url_to_string(url);
   dbg (0, "url %s gave %s\n", url, js);
 
   json_t *root;
@@ -519,20 +399,8 @@ gui_internal_foursquare_show_pois (struct gui_priv *this, struct widget *wm,
   char lng_string[50];
   snprintf (lng_string, 50, "%f", g.lng);
 
-  strcpy (url, baseurl);
-  strcat (url, lat_string);
-  strcat (url, ",");
-  strcat (url, lng_string);
-  strcat (url, "&radius=");
-  strcat (url, radius_string);
-  strcat (url, "&client_id=");
-  strcat (url, client_id);
-  strcat (url, "&client_secret=");
-  strcat (url, client_secret);
-  strcat (url, "&v=");
-  strcat (url, api_version);
-
-  char *js = json_fetch (url);
+  strcpy (url, g_strdup_printf ("%s%s,%s&radius=%s&client_id=%s&client_secret=%s&v=%s",  baseurl, lat_string, lng_string, radius_string, client_id, client_secret, api_version));
+  char *js=fetch_url_to_string(url);
 
   dbg (0, "url %s gave %s\n", url, js);
 
