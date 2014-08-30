@@ -1,7 +1,16 @@
-set(gui_internal_LIBS "-lspotify -lasound -lpthread -lcurl -ljansson")
+if(LIBSPOTIFY_FOUND)
+	set(spotify_LIBS "-lspotify -lasound -lpthread -lcurl")
+	set(spotify_sources gui_internal_spotify.c spotify/audio.c
+	spotify/alsa-audio.c)
+endif(LIBSPOTIFY_FOUND)
+if(JANSSON_FOUND)
+	set(foursquare_LIBS "-ljansson -lpthread")
+	set(fourquare_sources gui_internal_foursquare.c
+		gui_internal_googlesearch.c network.c)
+endif(JANSSON_FOUND)
+set(gui_internal_LIBS ${spotify_LIBS} ${foursquare_LIBS})
 module_add_library(gui_internal gui_internal.c gui_internal_bookmark.c
 	gui_internal_command.c gui_internal_gesture.c gui_internal_html.c
 	gui_internal_menu.c gui_internal_poi.c gui_internal_search.c
-	gui_internal_widget.c gui_internal_keyboard.c gui_internal_spotify.c
-	gui_internal_foursquare.c spotify/audio.c spotify/alsa-audio.c
-	foursquare/json.c foursquare/jsmn.c foursquare/buf.c)
+	gui_internal_widget.c gui_internal_keyboard.c
+	${spotify_sources} ${fourquare_sources})
