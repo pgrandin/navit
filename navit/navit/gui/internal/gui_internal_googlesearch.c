@@ -233,20 +233,3 @@ gui_internal_googlesearch_search(struct gui_priv *this, struct widget *wm, void 
                 gui_internal_widget_append(w, gui_internal_keyboard(this,keyboard_mode));
         gui_internal_menu_render(this);
 }
-
-static struct command_table navit_commands[] = {
-  {"googlesearch_search", command_cast (gui_internal_googlesearch_search)},
-};
-
-void
-googlesearch_navit_command_init (struct gui_priv *this, struct attr **attrs)
-{
-  struct attr *attr;
-  if ((attr = attr_search (attrs, NULL, attr_callback_list)))
-    {
-      command_add_table (attr->u.callback_list, navit_commands,
-			 sizeof (navit_commands) /
-			 sizeof (struct command_table), this);
-    }
-
-}

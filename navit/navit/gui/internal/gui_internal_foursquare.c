@@ -507,20 +507,3 @@ gui_internal_foursquare_show_pois (struct gui_priv *this, struct widget *wm,
 
   gui_internal_menu_render (this);
 }
-
-static struct command_table navit_commands[] = {
-  {"foursquare_show_pois", command_cast (gui_internal_foursquare_show_pois)},
-};
-
-void
-foursquare_navit_command_init (struct gui_priv *this, struct attr **attrs)
-{
-  struct attr *attr;
-  if ((attr = attr_search (attrs, NULL, attr_callback_list)))
-    {
-      command_add_table (attr->u.callback_list, navit_commands,
-			 sizeof (navit_commands) /
-			 sizeof (struct command_table), this);
-    }
-
-}

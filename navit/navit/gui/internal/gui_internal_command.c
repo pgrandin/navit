@@ -36,6 +36,16 @@
 #include "gui_internal_search.h"
 #include "gui_internal_poi.h"
 #include "gui_internal_command.h"
+#ifdef USE_SPOTIFY
+#include "gui_internal_spotify.h"
+#endif
+#ifdef USE_FOURSQUARE
+#include "gui_internal_foursquare.h"
+#endif
+#ifdef USE_GOOGLEPLACES
+#include "gui_internal_googlesearch.h"
+#endif
+
 
 extern char *version;
 
@@ -1203,6 +1213,15 @@ static struct command_table commands[] = {
 	{"waypoints",command_cast(gui_internal_cmd2)},
 	{"write",command_cast(gui_internal_cmd_write)},
 	{"about",command_cast(gui_internal_cmd2)},
+#ifdef USE_SPOTIFY
+	{"spotify_show_playlist", command_cast (gui_internal_spotify_show_playlist)},
+#endif
+#ifdef USE_FOURSQUARE
+	{"foursquare_show_pois", command_cast (gui_internal_foursquare_show_pois)},
+#endif
+#ifdef USE_GOOGLEPLACES
+	{"googlesearch_search", command_cast (gui_internal_googlesearch_search)},
+#endif
 
 };
 

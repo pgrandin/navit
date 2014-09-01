@@ -88,9 +88,12 @@
 #include "gui_internal_gesture.h"
 #include "gui_internal_poi.h"
 #include "gui_internal_command.h"
+#ifdef USE_SPOTIFY
 #include "gui_internal_spotify.h"
+#endif
+#ifdef USE_FOURSQUARE
 #include "gui_internal_foursquare.h"
-
+#endif
 
 /**
  * Indexes into the config_profiles array.
@@ -1265,6 +1268,7 @@ gui_internal_cmd_position_do(struct gui_priv *this, struct pcoord *pc_in, struct
 				gui_internal_cmd_results_to_map, NULL));
 		wbc->data=wm;
 	}
+#ifdef USE_FOURSQUARE
 	if (flags & 4096) {
 		gui_internal_widget_append(wtable,row=gui_internal_widget_table_row_new(this,gravity_left|orientation_horizontal|flags_fill));
 		gui_internal_widget_append(row,
@@ -1274,6 +1278,7 @@ gui_internal_cmd_position_do(struct gui_priv *this, struct pcoord *pc_in, struct
 		wbc->data_free=g_free_func;
 		wbc->c=pc;
 	}
+#endif
 	if ((flags & 256) || (flags & 1024)) {
 		struct displaylist_handle *dlh;
 		struct displaylist *display;
@@ -3218,8 +3223,6 @@ static struct gui_priv * gui_internal_new(struct navit *nav, struct gui_methods 
 	if ((attr=attr_search(attrs, NULL, attr_signal_on_map_click)))
 		this->signal_on_map_click=attr->u.num;
 	gui_internal_command_init(this, attrs);
-	spotify_navit_command_init(this, attrs);
-	foursquare_navit_command_init(this, attrs);
 
 	if( (attr=attr_search(attrs,NULL,attr_font_size)))
         {
@@ -3318,9 +3321,11 @@ static struct gui_priv * gui_internal_new(struct navit *nav, struct gui_methods 
 		this->radius=10;
 	if( (attr=attr_search(attrs,NULL,attr_font)))
 		this->font_name=g_strdup(attr->u.str);
-	spotify_set_attr(attrs);
-	spotify_navit_init();
 
+#ifdef USE_SPOTIFY
+        spotify_set_attr(attrs);
+        spotify_navit_init();
+#endif
 	this->data.priv=this;
 	this->data.gui=&gui_internal_methods_ext;
 	this->data.widget=&gui_internal_widget_methods;
