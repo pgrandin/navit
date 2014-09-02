@@ -93,4 +93,6 @@
 
 #cmakedefine HAVE_IMLIB2 1
 
+#cmakedefine USE_SPOTIFY 1
+#cmakedefine USE_FOURSQUARE 1
 #cmakedefine USE_GOOGLEPLACES 1
