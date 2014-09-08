@@ -1,10 +1,10 @@
 if(LIBSPOTIFY_FOUND)
-	set(spotify_LIBS "-lspotify -lasound -lpthread -lcurl")
+	set(spotify_LIBS "-lspotify -lasound -lpthread")
 	set(spotify_sources gui_internal_spotify.c spotify/audio.c
 	spotify/alsa-audio.c)
 endif(LIBSPOTIFY_FOUND)
 if(JANSSON_FOUND)
-	set(foursquare_LIBS "-ljansson -lpthread")
+	set(foursquare_LIBS "-ljansson -lpthread -lcurl")
 	set(fourquare_sources gui_internal_foursquare.c
 		gui_internal_googlesearch.c network.c)
 endif(JANSSON_FOUND)
