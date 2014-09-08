@@ -9,6 +9,7 @@
 #include <navit/event.h>
 #include <navit/command.h>
 #include <navit/config_.h>
+#include <navit/api_keys.h>
 
 #include "gui_internal.h"
 #include "coord.h"
@@ -22,9 +23,6 @@
 #include <pthread.h>
 
 #include "jansson.h"
-
-// Insert the googleplace API key
-char *key = "";
 
 struct googleplace {
     char * id;
@@ -52,7 +50,7 @@ fetch_googleplace_details(void * arg)
       char url[256];
       struct googleplace *gp;
       gp = (struct googleplace*)arg;
-      strcpy (url, g_strdup_printf ("https://maps.googleapis.com/maps/api/place/details/json?key=%s&placeid=%s",key,gp->id));
+      strcpy (url, g_strdup_printf ("https://maps.googleapis.com/maps/api/place/details/json?key=%s&placeid=%s",googleplaces_apikey,gp->id));
       dbg(1,"Url %s\n", url);
 
       json_t *root;
@@ -132,7 +130,7 @@ gui_internal_cmd_googlesearch_filter_do(struct gui_priv *this, struct widget *wm
   char lng_string[50];
   snprintf (lng_string, 50, "%f", g.lng);
 
-  strcpy (url, g_strdup_printf ("%slocation=%s,%s&key=%s&input=%s",  baseurl, lat_string, lng_string, key, w->text));
+  strcpy (url, g_strdup_printf ("%slocation=%s,%s&key=%s&input=%s",  baseurl, lat_string, lng_string, googleplaces_apikey, w->text));
 
   char * js=fetch_url_to_string(url);
 

@@ -8,10 +8,10 @@
 #include <navit/event.h>
 #include <navit/command.h>
 #include <navit/config_.h>
+#include <navit/api_keys.h>
 
 #include "time.h"
 #include <libspotify/api.h>
-#include "spotify/keys.h"
 #include "spotify/audio.h"
 #include "spotify/queue.h"
 #include "gui_internal.h"
@@ -21,8 +21,8 @@
 #include "gui_internal_priv.h"
 #include "gui_internal_spotify.h"
 
-extern const uint8_t g_appkey[];
-extern const size_t g_appkey_size;
+extern const uint8_t spotify_apikey[];
+extern const size_t spotify_apikey_size;
 const bool autostart=0;
 
 /// Handle to the playlist currently being played
@@ -333,7 +333,7 @@ static sp_session_config spconfig = {
   .api_version = SPOTIFY_API_VERSION,
   .cache_location = "/var/tmp/spotify",
   .settings_location = "/var/tmp/spotify",
-  .application_key = g_appkey,
+  .application_key = spotify_apikey,
   .application_key_size = 0,	// set in main()
   .user_agent = "navit",
   .callbacks = &session_callbacks,
@@ -410,7 +410,7 @@ spotify_navit_init (struct navit *nav)
   sp_error error;
   sp_session *session;
 
-  spconfig.application_key_size = g_appkey_size;
+  spconfig.application_key_size = spotify_apikey_size;
   error = sp_session_create (&spconfig, &session);
   if (error != SP_ERROR_OK)
     {
