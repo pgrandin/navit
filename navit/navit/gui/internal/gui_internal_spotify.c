@@ -8,7 +8,7 @@
 #include <navit/event.h>
 #include <navit/command.h>
 #include <navit/config_.h>
-#include <navit/api_keys.h>
+// #include <navit/api_keys.h>
 
 #include "time.h"
 #include <libspotify/api.h>
@@ -377,6 +377,7 @@ spotify_cmd_spotify_toggle (struct spotify *spotify)
     {
       dbg (0, "resuming playback\n");
       sp_session_player_play (g_sess, 1);
+      try_jukebox_start ();
     }
   spotify->playing = !spotify->playing;
 }
