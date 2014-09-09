@@ -208,11 +208,10 @@ on_login (sp_session * session, sp_error error)
   if (error != SP_ERROR_OK)
     {
       dbg (0, "Error: unable to log in: %s\n", sp_error_message (error));
-      exit (1);
+      return;
     }
 
   g_logged_in = 1;
-  // sp_playlistcontainer *pc = sp_session_playlistcontainer (session);
   spotify->pc = sp_session_playlistcontainer (session);
   int i;
 
