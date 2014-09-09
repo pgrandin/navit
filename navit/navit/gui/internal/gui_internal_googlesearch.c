@@ -33,19 +33,56 @@ struct googleplace {
     struct widget *wm;
 };
 
-static void
-googlesearch_set_destination (struct gui_priv *this, struct widget *wm,
-			    void *data)
+
+void *
+fetch_googleplace_details(struct googleplace * gp)
 {
-  char *name = wm->name;
-  dbg (1, "%s c=%d:0x%x,0x%x\n", name, wm->c.pro, wm->c.x, wm->c.y);
-  navit_set_destination (this->nav, &wm->c, name, 1);
+      char url[256];
+      strcpy (url, g_strdup_printf ("https://maps.googleapis.com/maps/api/place/details/json?key=%s&placeid=%s",googleplaces_apikey,gp->id));
+      dbg(0,"Url %s\n", url);
+
+      json_t *root;
+      json_error_t error;
+      json_t *result, *geometry, *location;
+      char * item_js= fetch_url_to_string(url);
+      dbg(1,"%s\n",item_js);
+      root = json_loads (item_js, 0, &error);
+      free(item_js);
+      if(!root)
+      {
+          dbg(0,"Invalid json for url %s, giving up for place id %s\n",url,gp->id);
+          json_decref (root);
+          return 0;
+      }
+      // result->geometry->location->lat
+      result = json_object_get (root, "result");
+      geometry = json_object_get (result, "geometry");
+      location = json_object_get (geometry, "location");
+      gp->g.lat = json_real_value (json_object_get (location, "lat"));
+      gp->g.lng = json_real_value (json_object_get (location, "lng"));
+      transform_from_geo (projection_mg, &gp->g, &gp->c);
+      dbg (1, "Item as at : %4.16f x %4.16f [ %d x %d ]\n", gp->g.lat, gp->g.lng, gp->c.x, gp->c.y);
+      json_decref (root);
+      return 0;
+}
+
+static void
+googlesearch_set_destination (struct gui_priv *this, struct widget *wm, void *data)
+{
+  struct googleplace gp;
+  gp.id = wm->name;
+  fetch_googleplace_details(&gp);
+  struct coord c;
+  c=gp.c;
+  dbg (0, "%s c=%d:0x%x,0x%x\n", gp.description, wm->c.pro, c.x, c.y);
+  // FIXME : s/id/description
+  navit_set_destination (this->nav, &c, gp.id, 1);
   gui_internal_prune_menu (this, NULL);
 }
 
 
 void *
-fetch_googleplace_details(void * arg)
+fetch_googleplace_details_as_thread(void * arg)
 {
       char url[256];
       struct googleplace *gp;
@@ -149,7 +186,7 @@ gui_internal_cmd_googlesearch_filter_do(struct gui_priv *this, struct widget *wm
 
   // The autocomplete API returns max 5 results
   pthread_t thread_id[5];
-  struct googleplace gp[5];
+//  struct googleplace gp[5];
 
   for (i = 0; i < json_array_size (venues); i++)
     {
@@ -158,25 +195,48 @@ gui_internal_cmd_googlesearch_filter_do(struct gui_priv *this, struct widget *wm
       description = json_object_get (venue, "description");
       id = json_object_get (venue, "place_id");
 
-      dbg (1, "Found [%i] %s with id %s\n", i, json_string_value (description), json_string_value (id));
+      dbg (0, "Found [%i] %s with id %s\n", i, json_string_value (description), json_string_value (id));
       strcpy (track_icon, "default");
+#if 0
       gp[i].id=g_strdup(json_string_value (id));
       gp[i].description=g_strdup(json_string_value (description));
       gp[i].gui_priv=this;
       gp[i].wm=wm;
-      pthread_create( &thread_id[i], NULL, &fetch_googleplace_details, &gp[i] );
+      pthread_create( &thread_id[i], NULL, &fetch_googleplace_details_as_thread, &gp[i] );
+#endif
+  
+      struct widget *wtable=gui_internal_menu_data(this)->search_list;
+      struct widget *wc;
+      struct widget *row;
+      gui_internal_widget_append (wtable, row =
+                      gui_internal_widget_table_row_new (this,
+                           gravity_left | orientation_horizontal | flags_fill));
+      gui_internal_widget_append (row, wc =
+                      gui_internal_button_new_with_callback (this,
+                                         json_string_value(description),
+                                         image_new_xs (this, "gui_active"),
+                                         gravity_left_center | orientation_horizontal | flags_fill,
+                                         googlesearch_set_destination,
+                                         NULL));
+    
+      wc->selection_id = wm->selection_id;
+      wc->name = g_strdup (json_string_value(id));
+      wc->c.pro = projection_mg;
+      wc->prefix = g_strdup (wm->prefix);
+      dbg(0,"id set to %s\n",wc->name);
     }
+#if 0
    int j;
    for(j=0; j < json_array_size (venues); j++)
    {
       dbg(1,"Checking thread #%i with p:%p\n",j,thread_id[j]);
       pthread_join( thread_id[j], NULL);
    }
-
+#endif
     clock_gettime(CLOCK_REALTIME, &now);
 
     double seconds = (double)((now.tv_sec+now.tv_nsec*1e-9) - (double)(tmstart.tv_sec+tmstart.tv_nsec*1e-9));
-    dbg(1,"wall time %fs\n", seconds);
+    dbg(0,"wall time %fs\n", seconds);
     gui_internal_menu_render(this);
   g_free (prefix);
   json_decref (root);
@@ -216,7 +276,7 @@ gui_internal_googlesearch_search(struct gui_priv *this, struct widget *wm, void 
         wk->flags |= flags_expand|flags_fill;
         wk->name=g_strdup("POIsFilter");
         wk->c=wm->c;
-        dbg (1, "googlesearch filter called for %d x %d\n", wm->c.x, wm->c.y);
+        dbg (0, "googlesearch filter called for %d x %d\n", wm->c.x, wm->c.y);
         gui_internal_widget_append(we, wb=gui_internal_image_new(this, image_new_xs(this, "gui_active")));
         wb->state |= STATE_SENSITIVE;
         wb->func = gui_internal_cmd_googlesearch_filter_do;
