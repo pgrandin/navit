@@ -1,6 +1,7 @@
 #include "curl/curl.h"
 #include <navit/debug.h>
 #include "unistd.h"
+#include "stddef.h"
 
 struct string
 {
@@ -43,21 +44,56 @@ write_data (void *ptr, size_t size, size_t nmemb, FILE * stream)
   return written;
 }
 
+// From http://creativeandcritical.net/str-replace-c/
+char *replace_str(const char *str, const char *old, const char *new)
+{
+	char *ret, *r;
+	const char *p, *q;
+	size_t oldlen = strlen(old);
+	size_t count, retlen, newlen = strlen(new);
+
+	if (oldlen != newlen) {
+		for (count = 0, p = str; (q = strstr(p, old)) != NULL; p = q + oldlen)
+			count++;
+		/* this is undefined if p - str > PTRDIFF_MAX */
+		retlen = p - str + strlen(p) + count * (newlen - oldlen);
+	} else
+		retlen = strlen(str);
+
+	if ((ret = malloc(retlen + 1)) == NULL)
+		return NULL;
+
+	for (r = ret, p = str; (q = strstr(p, old)) != NULL; p = q + oldlen) {
+		/* this is undefined if q - p > PTRDIFF_MAX */
+		ptrdiff_t l = q - p;
+		memcpy(r, p, l);
+		r += l;
+		memcpy(r, new, newlen);
+		r += newlen;
+	}
+	strcpy(r, p);
+
+	return ret;
+}
+
+
 char *
 fetch_url_to_string(char * url)
 {
   struct string s;
+  char * sanitized_url=replace_str(url," ","%20");
   init_string (&s);
   CURL *curl;
   curl_global_init (CURL_GLOBAL_ALL);
   curl = curl_easy_init ();
-  curl_easy_setopt (curl, CURLOPT_URL, url);
+  curl_easy_setopt (curl, CURLOPT_URL, sanitized_url);
   curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, writefunc);
   curl_easy_setopt (curl, CURLOPT_WRITEDATA, &s);
   curl_easy_perform (curl);
   curl_easy_cleanup (curl);
-  dbg (1, "url %s gave %s\n", url, s.ptr);
-  dbg (0, "size of js is %i\n", strlen(s.ptr));
+  dbg (1, "url %s gave %s\n", sanitized_url, s.ptr);
+  dbg (0, "url %s gave js of size %i\n", sanitized_url, strlen(s.ptr));
+  free(sanitized_url);
   return strdup(s.ptr);
   // FIXME : we have a memleak here
   // js = malloc(sizeof(char)*(strlen(s.ptr)+1));
