@@ -10,6 +10,7 @@
 #include <navit/command.h>
 #include <navit/config_.h>
 #include <navit/api_keys.h>
+#include <navit/transform.h>
 
 #include "gui_internal.h"
 #include "coord.h"
@@ -26,116 +27,63 @@
 
 struct googleplace {
     char * id;
-    char * description;
-    struct coord c;
+    char * name;
+    struct pcoord c;
     struct coord_geo g;
     struct gui_priv *gui_priv;
     struct widget *wm;
 };
 
 
-void *
-fetch_googleplace_details(struct googleplace * gp)
+struct googleplace 
+fetch_googleplace_details(char * id)
 {
       char url[256];
-      strcpy (url, g_strdup_printf ("https://maps.googleapis.com/maps/api/place/details/json?key=%s&placeid=%s",googleplaces_apikey,gp->id));
+      strcpy (url, g_strdup_printf ("https://maps.googleapis.com/maps/api/place/details/json?key=%s&placeid=%s",googleplaces_apikey,id));
       dbg(0,"Url %s\n", url);
 
       json_t *root;
       json_error_t error;
-      json_t *result, *geometry, *location;
       char * item_js= fetch_url_to_string(url);
       dbg(1,"%s\n",item_js);
       root = json_loads (item_js, 0, &error);
       free(item_js);
       if(!root)
       {
-          dbg(0,"Invalid json for url %s, giving up for place id %s\n",url,gp->id);
+          dbg(0,"Invalid json for url %s, giving up for place id %s\n",url,id);
           json_decref (root);
-          return 0;
+          return;
       }
+
+      struct googleplace gp;
       // result->geometry->location->lat
+      json_t *result, *geometry, *location, *name;
       result = json_object_get (root, "result");
       geometry = json_object_get (result, "geometry");
+      name = json_object_get (result, "name");
       location = json_object_get (geometry, "location");
-      gp->g.lat = json_real_value (json_object_get (location, "lat"));
-      gp->g.lng = json_real_value (json_object_get (location, "lng"));
-      transform_from_geo (projection_mg, &gp->g, &gp->c);
-      dbg (1, "Item as at : %4.16f x %4.16f [ %d x %d ]\n", gp->g.lat, gp->g.lng, gp->c.x, gp->c.y);
+      gp.g.lat = json_real_value (json_object_get (location, "lat"));
+      gp.g.lng = json_real_value (json_object_get (location, "lng"));
+      gp.c.pro=projection_mg;
+      struct coord c;
+      transform_from_geo (projection_mg, &gp.g, &c);
+      gp.c.x=c.x;
+      gp.c.y=c.y;
+      dbg (0, "Item %s as at : %4.16f x %4.16f [ %x x %x ]\n", json_string_value(name), gp.g.lat, gp.g.lng, gp.c.x, gp.c.y);
+      gp.name=g_strdup(json_string_value(name));
       json_decref (root);
-      return 0;
+      return gp;
 }
 
 static void
 googlesearch_set_destination (struct gui_priv *this, struct widget *wm, void *data)
 {
-  struct googleplace gp;
-  gp.id = wm->name;
-  fetch_googleplace_details(&gp);
-  struct coord c;
-  c=gp.c;
-  dbg (0, "%s c=%d:0x%x,0x%x\n", gp.description, wm->c.pro, c.x, c.y);
-  // FIXME : s/id/description
-  navit_set_destination (this->nav, &c, gp.id, 1);
+  struct googleplace gp=fetch_googleplace_details(wm->name);
+  dbg (0, "%s c=%d:0x%x,0x%x [ %4.16f x %4.16f }\n", gp.name, gp.c.pro, gp.c.x, gp.c.y, gp.g.lat, gp.g.lng);
+  navit_set_destination (this->nav, &gp.c, gp.name, 1);
   gui_internal_prune_menu (this, NULL);
 }
 
-
-void *
-fetch_googleplace_details_as_thread(void * arg)
-{
-      char url[256];
-      struct googleplace *gp;
-      gp = (struct googleplace*)arg;
-      strcpy (url, g_strdup_printf ("https://maps.googleapis.com/maps/api/place/details/json?key=%s&placeid=%s",googleplaces_apikey,gp->id));
-      dbg(1,"Url %s\n", url);
-
-      json_t *root;
-      json_error_t error;
-      json_t *result, *geometry, *location;
-      char * item_js= fetch_url_to_string(url);
-      dbg(1,"%s\n",item_js);
-      root = json_loads (item_js, 0, &error);
-      free(item_js);
-      if(!root)
-      {
-          dbg(0,"Invalid json for url %s, giving up for place id %s\n",url,gp->id);
-          json_decref (root);
-          return 0;
-      }
-      // result->geometry->location->lat
-      result = json_object_get (root, "result");
-      geometry = json_object_get (result, "geometry");
-      location = json_object_get (geometry, "location");
-      gp->g.lat = json_real_value (json_object_get (location, "lat"));
-      gp->g.lng = json_real_value (json_object_get (location, "lng"));
-      transform_from_geo (projection_mg, &gp->g, &gp->c);
-      dbg (1, "Item as at : %4.16f x %4.16f [ %d x %d ]\n", gp->g.lat, gp->g.lng, gp->c.x, gp->c.y);
-      json_decref (root);
-  
-      struct widget *wtable=gui_internal_menu_data(gp->gui_priv)->search_list;
-      struct widget *wc;
-      struct widget *row;
-      gui_internal_widget_append (wtable, row =
-                      gui_internal_widget_table_row_new (gp->gui_priv,
-                           gravity_left | orientation_horizontal | flags_fill));
-      gui_internal_widget_append (row, wc =
-                      gui_internal_button_new_with_callback (gp->gui_priv,
-                                         gp->description,
-                                         image_new_xs (gp->gui_priv, "gui_active"),
-                                         gravity_left_center | orientation_horizontal | flags_fill,
-                                         googlesearch_set_destination,
-                                         gp->wm));
-    
-      wc->item = gp->wm->item;
-      wc->selection_id = gp->wm->selection_id;
-      wc->name = g_strdup (gp->description);
-      wc->c.x = gp->c.x;
-      wc->c.y = gp->c.y;
-      wc->c.pro = projection_mg;
-      wc->prefix = g_strdup (gp->wm->prefix);
-      return 0;
-}
 
 static void
 gui_internal_cmd_googlesearch_filter_do(struct gui_priv *this, struct widget *wm, void *data)
@@ -152,8 +100,9 @@ gui_internal_cmd_googlesearch_filter_do(struct gui_priv *this, struct widget *wm
   struct transformation *trans;
   trans = navit_get_trans (this->nav);
   struct coord c;
-  c.x = wm->c.x;
-  c.y = wm->c.y;
+  // We want the search to be relative to where we clicked on the map
+  c.x = this->clickp.x;
+  c.y = this->clickp.y;
 
   transform_to_geo (transform_get_projection (trans), &c, &g);
 
@@ -166,8 +115,9 @@ gui_internal_cmd_googlesearch_filter_do(struct gui_priv *this, struct widget *wm
   snprintf (lat_string, 50, "%f", g.lat);
   char lng_string[50];
   snprintf (lng_string, 50, "%f", g.lng);
+  char *radius="20000";
 
-  strcpy (url, g_strdup_printf ("%slocation=%s,%s&key=%s&input=%s",  baseurl, lat_string, lng_string, googleplaces_apikey, w->text));
+  strcpy (url, g_strdup_printf ("%slocation=%s,%s&key=%s&input=%s&radius=%s",  baseurl, lat_string, lng_string, googleplaces_apikey, w->text, radius));
 
   char * js=fetch_url_to_string(url);
 
@@ -195,7 +145,7 @@ gui_internal_cmd_googlesearch_filter_do(struct gui_priv *this, struct widget *wm
       description = json_object_get (venue, "description");
       id = json_object_get (venue, "place_id");
 
-      dbg (0, "Found [%i] %s with id %s\n", i, json_string_value (description), json_string_value (id));
+      dbg (1, "Found [%i] %s with id %s\n", i, json_string_value (description), json_string_value (id));
       strcpy (track_icon, "default");
 #if 0
       gp[i].id=g_strdup(json_string_value (id));
@@ -223,7 +173,6 @@ gui_internal_cmd_googlesearch_filter_do(struct gui_priv *this, struct widget *wm
       wc->name = g_strdup (json_string_value(id));
       wc->c.pro = projection_mg;
       wc->prefix = g_strdup (wm->prefix);
-      dbg(0,"id set to %s\n",wc->name);
     }
 #if 0
    int j;
@@ -276,12 +225,12 @@ gui_internal_googlesearch_search(struct gui_priv *this, struct widget *wm, void 
         wk->flags |= flags_expand|flags_fill;
         wk->name=g_strdup("POIsFilter");
         wk->c=wm->c;
-        dbg (0, "googlesearch filter called for %d x %d\n", wm->c.x, wm->c.y);
+        dbg (0, "googlesearch filter called for %d x %d\n", this->clickp.x, this->clickp.y);
         gui_internal_widget_append(we, wb=gui_internal_image_new(this, image_new_xs(this, "gui_active")));
         wb->state |= STATE_SENSITIVE;
         wb->func = gui_internal_cmd_googlesearch_filter_do;
         wb->name=g_strdup("NameFilter");
-        wb->c=wm->c;
+        wb->c=this->clickp;
         wb->data=wk;
         wl=gui_internal_widget_table_new(this,gravity_left_top | flags_fill | flags_expand |orientation_vertical,1);
         gui_internal_widget_append(wr, wl);
