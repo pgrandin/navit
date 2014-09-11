@@ -9,7 +9,6 @@
 #include <navit/event.h>
 #include <navit/command.h>
 #include <navit/config_.h>
-#include <navit/api_keys.h>
 #include <navit/transform.h>
 
 #include "gui_internal.h"
@@ -24,6 +23,8 @@
 #include <pthread.h>
 
 #include "jansson.h"
+
+extern const char *googleplaces_apikey;
 
 struct googleplace {
     char * id;
