@@ -345,8 +345,8 @@ spotify_spotify_idle (struct spotify *spotify)
   sp_session_process_events (g_sess, &next_timeout);
 }
 
-static void
-spotify_cmd_spotify_previous_track (struct spotify *spotify)
+void
+gui_internal_spotify_previous_track (struct gui_priv *this, struct widget *wm, void *data)
 {
   if (g_track_index > 0)
     {
@@ -356,16 +356,16 @@ spotify_cmd_spotify_previous_track (struct spotify *spotify)
   try_jukebox_start ();
 }
 
-static void
-spotify_cmd_spotify_next_track (struct spotify *spotify)
+void
+gui_internal_spotify_next_track (struct gui_priv *this, struct widget *wm, void *data)
 {
   ++g_track_index;
   dbg (0, "skipping to next track\n");
   try_jukebox_start ();
 }
 
-static void
-spotify_cmd_spotify_toggle (struct spotify *spotify)
+void
+gui_internal_spotify_toggle (struct gui_priv *this, struct widget *wm, void *data)
 {
   if (spotify->playing)
     {
@@ -391,17 +391,6 @@ gui_internal_spotify_play_random_track (struct spotify *spotify)
   try_jukebox_start ();
 
 }
-
-static struct command_table navit_commands[] = {
-  {"spotify_toggle", command_cast (spotify_cmd_spotify_toggle)},
-  {"spotify_next_track", command_cast (spotify_cmd_spotify_next_track)},
-  {"spotify_previous_track",
-   command_cast (spotify_cmd_spotify_previous_track)},
-  {"spotify_show_playlist",
-   command_cast (gui_internal_spotify_show_playlist)},
-  {"spotify_play_random_track",
-   command_cast (gui_internal_spotify_play_random_track)},
-};
 
 void
 spotify_navit_init (struct navit *nav)
@@ -429,25 +418,6 @@ spotify_navit_init (struct navit *nav)
   dbg (0, "Callback created successfully\n");
   struct attr attr;
   spotify->navit = nav;
-
-//  if (navit_get_attr(nav, attr_callback_list, &attr, NULL)) {
-//      dbg(0,"Adding command\n");
-//      command_add_table(attr.u.callback_list, navit_commands, sizeof(navit_commands)/sizeof(struct command_table), spotify);
-//  }
-
-}
-
-void
-spotify_navit_command_init (struct gui_priv *this, struct attr **attrs)
-{
-  struct attr *attr;
-  if ((attr = attr_search (attrs, NULL, attr_callback_list)))
-    {
-      command_add_table (attr->u.callback_list, navit_commands,
-			 sizeof (navit_commands) /
-			 sizeof (struct command_table), this);
-    }
-
 }
 
 void
