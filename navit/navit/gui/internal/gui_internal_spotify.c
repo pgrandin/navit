@@ -8,7 +8,6 @@
 #include <navit/event.h>
 #include <navit/command.h>
 #include <navit/config_.h>
-// #include <navit/api_keys.h>
 
 #include "time.h"
 #include <libspotify/api.h>
