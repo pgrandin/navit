@@ -399,6 +399,10 @@ spotify_navit_init (struct navit *nav)
   sp_session *session;
 
   spconfig.application_key_size = spotify_apikey_size;
+  if ( spconfig.application_key_size == 0) {
+     dbg(0, "Can't create session, did you setup your spotify apikey ?\n");
+     return;
+  }
   error = sp_session_create (&spconfig, &session);
   if (error != SP_ERROR_OK)
     {
