@@ -417,7 +417,7 @@ spotify_navit_init (struct navit *nav)
   spotify->navit = nav;
   spotify->callback =
     callback_new_1 (callback_cast (spotify_spotify_idle), spotify);
-  event_add_idle (500, spotify->callback);
+  event_add_idle (125, spotify->callback);
   dbg (0, "Callback created successfully\n");
   struct attr attr;
   spotify->navit = nav;
