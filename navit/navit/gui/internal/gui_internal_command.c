@@ -45,7 +45,8 @@
 #ifdef USE_GOOGLEPLACES
 #include "gui_internal_googlesearch.h"
 #endif
-
+#include <ifaddrs.h>
+#include <arpa/inet.h>
 
 extern char *version;
 
@@ -199,6 +200,27 @@ gui_internal_cmd2_about(struct gui_priv *this, char *function, struct attr **in,
 	gui_internal_widget_append(wb, w=gui_internal_label_new(this, text));
 	w->flags=gravity_top_center|orientation_horizontal|flags_expand;
 	g_free(text);
+	
+	// Network info
+        struct ifaddrs *addrs, *tmp;
+        getifaddrs(&addrs);
+        tmp = addrs;
+
+        while (tmp)
+        {
+            if (tmp->ifa_addr && tmp->ifa_addr->sa_family == AF_INET)
+            {
+                struct sockaddr_in *pAddr = (struct sockaddr_in *)tmp->ifa_addr;
+		if(g_ascii_strncasecmp(tmp->ifa_name,"lo",2 ) ) {
+			text=g_strdup_printf("%s: %s", tmp->ifa_name, inet_ntoa(pAddr->sin_addr));
+			gui_internal_widget_append(wb, w=gui_internal_label_new(this, text));
+        		w->flags=gravity_bottom_center|orientation_horizontal|flags_fill;
+        		g_free(text);	
+		}
+            }
+            tmp = tmp->ifa_next;
+        }
+        freeifaddrs(addrs);
 
 	//Authors
 	text=g_strdup_printf("%s:",_("By"));
