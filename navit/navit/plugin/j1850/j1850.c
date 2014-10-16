@@ -69,13 +69,19 @@ j1850_idle(struct j1850 *j1850)
                 //append(response,255,'\0');
 		current_time = time(NULL);
                 j1850->message[j1850->index]='\0';
+                // printf("%i : %s\n", current_time, j1850->message);
+		FILE *fp;
+		char str[] = "test";     
+	
+		fp = fopen("/home/navit/.navit/obd/obd.log","a");
+		fprintf(fp, "%i,%s\n", current_time, j1850->message);
+		fclose(fp); 
                 char header[3];
                 strncpy(header, j1850->message, 2);
                 header[2]='\0';
                 if( strncmp(header,"10",2)==0 ) {
 			char * w1 =strndup(j1850->message+2, 4);
 			int rpm = ((int)strtol(w1, NULL, 16) ) / 4 ;
-			dbg(0,"RPM : %i from %s\n",rpm, w1);
                 } else if( strncmp(header,"3D",2)==0 ) {
                         if (strcmp(j1850->message, "3D110000EE") == 0) {
                                 // noise
@@ -94,8 +100,12 @@ j1850_idle(struct j1850 *j1850)
                         } else {
                                 printf("Got button from %s\n", j1850->message);
                         }
+                } else if( strncmp(header,"72",2)==0 ) {
+			char * data=strndup(j1850->message+2, 8);
+			int odo=((int)strtol(data, NULL, 16) )/8000;
+                        printf("%i : Got odo %i from %s\n", current_time, odo, j1850->message);
                 } else if( strncmp(header,"90",2)==0 ) {
-                        printf("%i : Got metric from %x\n", current_time, j1850->message);
+                        printf("%i : Got metric from %s\n", current_time, j1850->message);
                 } else {
                         // printf(" ascii: %i [%s] with header [%s]\n",buf, response, header);
                 }
