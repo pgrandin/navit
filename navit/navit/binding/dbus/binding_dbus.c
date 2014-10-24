@@ -50,7 +50,7 @@
 #include "layout.h"
 #include "roadprofile.h"
 #include "util.h"
-
+#include "event.h"
 
 static DBusConnection *connection;
 static dbus_uint32_t dbus_serial;
@@ -1269,9 +1269,11 @@ request_navit_quit(DBusConnection *connection, DBusMessage *message)
 
         navit.u.navit=nav;
         config_remove_attr(config, &navit);
-        event_main_loop_quit();
-	// FIXME : dbus-client will complain about not receiving a message
-	// maybe we can schedule a callback to actually quit Navit
+	
+	struct callback *callback;
+	callback=callback_new_1(callback_cast(event_main_loop_quit), NULL);
+        event_add_timeout(1000, 1, callback);
+	return empty_reply(connection, message);
 }
 
 static DBusHandlerResult
