@@ -1,3 +1,4 @@
+/* vim: set tabstop=4 expandtab: */
 #include <glib.h>
 #include <navit/main.h>
 #include <navit/debug.h>
@@ -37,6 +38,7 @@ int g_logged_in;
 static audio_fifo_t g_audiofifo;
 
 int next_timeout = 0;
+long previous_volume=-1;
 
 struct attr initial_layout, main_layout;
 
@@ -380,6 +382,41 @@ gui_internal_spotify_toggle (struct gui_priv *this, struct widget *wm, void *dat
   spotify->playing = !spotify->playing;
 }
 
+
+// This belongs to audio rather than spotify
+void
+gui_internal_spotify_volume_up (struct gui_priv *this, struct widget *wm, void *data)
+{
+    dbg(0,"Raising volume\n");
+    long vol = -1;
+    audio_volume(AUDIO_VOLUME_GET, &vol);
+    vol+=10;
+    audio_volume(AUDIO_VOLUME_SET, &vol);
+}
+
+void
+gui_internal_spotify_volume_down (struct gui_priv *this, struct widget *wm, void *data)
+{
+    long vol = -1;
+    audio_volume(AUDIO_VOLUME_GET, &vol);
+    vol-=10;
+    audio_volume(AUDIO_VOLUME_SET, &vol);
+}
+
+void
+gui_internal_spotify_volume_toggle (struct gui_priv *this, struct widget *wm, void *data)
+{
+    if (previous_volume == -1 ) {
+        // no previous volume know. We should mute
+        audio_volume(AUDIO_VOLUME_GET, &previous_volume);
+        long vol = 0;
+        audio_volume(AUDIO_VOLUME_SET, &vol);
+    } else {
+        audio_volume(AUDIO_VOLUME_SET, &previous_volume);
+	previous_volume=-1;
+    }
+}
+
 static void
 gui_internal_spotify_play_random_track (struct spotify *spotify)
 {
@@ -394,33 +431,37 @@ gui_internal_spotify_play_random_track (struct spotify *spotify)
 void
 spotify_navit_init (struct navit *nav)
 {
-  dbg (0, "spotify_navit_init\n");
-  sp_error error;
-  sp_session *session;
-
-  spconfig.application_key_size = spotify_apikey_size;
-  if ( spconfig.application_key_size == 0) {
-     dbg(0, "Can't create session, did you setup your spotify apikey ?\n");
-     return;
-  }
-  error = sp_session_create (&spconfig, &session);
-  if (error != SP_ERROR_OK)
-    {
-      dbg (0, "Can't create spotify session :(\n");
-      return;
+    dbg (0, "spotify_navit_init\n");
+    sp_error error;
+    sp_session *session;
+    
+    long vol = -1;
+    audio_volume(AUDIO_VOLUME_GET, &vol);
+    dbg(0,"Master volume is %i\n", vol);
+    
+    spconfig.application_key_size = spotify_apikey_size;
+    if ( spconfig.application_key_size == 0) {
+        dbg(0, "Can't create session, did you setup your spotify apikey ?\n");
+        return;
     }
-  dbg (0, "Session created successfully :)\n");
-  g_sess = session;
-  g_logged_in = 0;
-  sp_session_login (session, spotify->login, spotify->password, 0, NULL);
-  audio_init (&g_audiofifo);
-  spotify->navit = nav;
-  spotify->callback =
-    callback_new_1 (callback_cast (spotify_spotify_idle), spotify);
-  event_add_idle (125, spotify->callback);
-  dbg (0, "Callback created successfully\n");
-  struct attr attr;
-  spotify->navit = nav;
+    error = sp_session_create (&spconfig, &session);
+    if (error != SP_ERROR_OK)
+    {
+        dbg (0, "Can't create spotify session :(\n");
+        return;
+    }
+    dbg (0, "Session created successfully :)\n");
+    g_sess = session;
+    g_logged_in = 0;
+    sp_session_login (session, spotify->login, spotify->password, 0, NULL);
+    audio_init (&g_audiofifo);
+    spotify->navit = nav;
+    // FIXME : we should probably use another way to access the callback then add_idle
+    spotify->callback = callback_new_1 (callback_cast (spotify_spotify_idle), spotify);
+    event_add_idle (125, spotify->callback);
+    dbg (0, "Callback created successfully\n");
+    struct attr attr;
+    spotify->navit = nav;
 }
 
 void
@@ -436,11 +477,6 @@ spotify_navit (struct navit *nav, int add)
       navit_add_attr (nav, &callback);
     }
 }
-
-struct marker
-{
-  struct cursor *cursor;
-};
 
 void
 spotify_set_attr (struct attr **attrs)
@@ -467,23 +503,23 @@ spotify_set_attr (struct attr **attrs)
       spotify->playlist = attr->u.str;
     }
 
-char **hints;
-/* Enumerate sound devices */
-int err = snd_device_name_hint(-1, "pcm", (void***)&hints);
-if (err != 0)
-   return;//Error! Just return
+    char **hints;
+    /* Enumerate sound devices */
+    int err = snd_device_name_hint(-1, "pcm", (void***)&hints);
+    if (err != 0)
+       return;//Error! Just return
+    
+    char** n = hints;
+    while (*n != NULL) {
 
-char** n = hints;
-while (*n != NULL) {
-
-    char *name = snd_device_name_get_hint(*n, "NAME");
-	dbg(0,"Found audio device %s\n",name);
-
-    if (name != NULL && 0 != strcmp("null", name)) {
-        //Copy name to another buffer and then free it
-        free(name);
-    }
-    n++;
+        char *name = snd_device_name_get_hint(*n, "NAME");
+    	dbg(0,"Found audio device %s\n",name);
+    
+        if (name != NULL && 0 != strcmp("null", name)) {
+            //Copy name to another buffer and then free it
+            free(name);
+        }
+        n++;
 }//End of while
 
 //Free hint buffer too
@@ -514,8 +550,8 @@ spotify_play_playlist (struct gui_priv *this, struct widget *wm, void *data)
 void
 spotify_play_toggle_offline_mode (struct gui_priv *this, struct widget *wm, void *data)
 {
-            sp_playlist_set_offline_mode (g_sess, g_jukeboxlist,  sp_playlist_get_offline_status (g_sess, g_jukeboxlist) != 1);
-	    gui_internal_spotify_show_playlist(this,wm,data);
+    sp_playlist_set_offline_mode (g_sess, g_jukeboxlist,  sp_playlist_get_offline_status (g_sess, g_jukeboxlist) != 1);
+    gui_internal_spotify_show_playlist(this,wm,data);
 }
 
 static struct widget *

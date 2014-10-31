@@ -6,3 +6,6 @@ void gui_internal_spotify_show_rootlist(struct gui_priv *this, struct widget *wm
 void gui_internal_spotify_toggle (struct gui_priv *this, struct widget *wm, void *data);
 void gui_internal_spotify_previous_track (struct gui_priv *this, struct widget *wm, void *data);
 void gui_internal_spotify_next_track (struct gui_priv *this, struct widget *wm, void *data);
+void gui_internal_spotify_volume_down (struct gui_priv *this, struct widget *wm, void *data);
+void gui_internal_spotify_volume_up (struct gui_priv *this, struct widget *wm, void *data);
+void gui_internal_spotify_volume_toggle (struct gui_priv *this, struct widget *wm, void *data);
