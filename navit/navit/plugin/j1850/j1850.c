@@ -1,3 +1,4 @@
+/* vim: set tabstop=4 expandtab: */
 /**
  * Navit, a modular navigation system.
  * Copyright (C) 2005-2008 Navit Team
@@ -41,162 +42,281 @@
 #include <navit/event.h>
 #include <navit/command.h>
 #include <navit/config_.h>
+#include "graphics.h"
+#include "color.h"
+#include "osd.h"
+
+const char *init_string[] = {
+	"ATZ\r\n",
+	"ATI\r\n",
+	"ATL1\r\n",
+	"ATH1\r\n",
+	"ATS1\r\n",
+	"ATAL\r\n",
+	"ATMA\r\n",
+    NULL
+};
 
 struct j1850 {
+	struct navit *nav;
 	int status;
 	int device;
 	int index;
 	char message[255];
+	char * filename;
 	struct event_idle *idle;
 	struct callback *callback;
+  	struct osd_item osd_item;
+   	int width;
+   	struct graphics_gc *orange,*white;
+   	struct callback *click_cb;
+    int init_string_index;
+
+    int rpm;
+    int tank_level;
+    int odo;
 };
+
+void rand_str(char *dest, size_t length) {
+    char charset[] = "0123456789"
+                     "ABCDEF";
+
+    while (length-- > 0) {
+        size_t index = (double) rand() / RAND_MAX * (sizeof charset - 1);
+        *dest++ = charset[index];
+    }
+    *dest = '\0';
+}
+
+void write_to_serial_port(unsigned char *cmd, int device)
+{
+	int n_written = 0;
+	do {
+        n_written += write( device, &cmd[n_written], 1 );
+    }
+    while (cmd[n_written-1] != '\r' && n_written > 0);
+    dbg(0,"sent %s to the serial port\n",cmd);
+}
 
 static void
 j1850_idle(struct j1850 *j1850)
 {
-	time_t current_time;
-	int res;
-	int n;
-	int value;
-	char buf = '\0';
-   	n = read( j1850->device, &buf, 1 );
-   if(n == -1) {
-        printf("x");
-   } else if (n==0) {
-        printf(".");
-   } else {
-        if( buf == 13 ) {
-                //append(response,255,'\0');
-		current_time = time(NULL);
-                j1850->message[j1850->index]='\0';
-                // printf("%i : %s\n", current_time, j1850->message);
-		FILE *fp;
-		char str[] = "test";     
-	
-		fp = fopen("/home/navit/.navit/obd/obd.log","a");
-		fprintf(fp, "%i,%s\n", current_time, j1850->message);
-		fclose(fp); 
-                char header[3];
-                strncpy(header, j1850->message, 2);
-                header[2]='\0';
-                if( strncmp(header,"10",2)==0 ) {
-			char * w1 =strndup(j1850->message+2, 4);
-			int rpm = ((int)strtol(w1, NULL, 16) ) / 4 ;
-                } else if( strncmp(header,"3D",2)==0 ) {
-                        if (strcmp(j1850->message, "3D110000EE") == 0) {
-                                // noise
-                        } else if (strcmp(j1850->message, "3D1120009B") == 0) {
-                                printf("L1\n");
-                        } else if (strcmp(j1850->message, "3D110080C8") == 0) {
-                                printf("L2\n");
-                        } else if (strcmp(j1850->message, "3D1110005A") == 0) {
-                                printf("L3\n");
-                        } else if (strcmp(j1850->message, "3D110400C3") == 0) {
-                                printf("R1\n");
-                        } else if (strcmp(j1850->message, "3D110002D4") == 0) {
-                                printf("R2\n");
-                        } else if (strcmp(j1850->message, "3D11020076") == 0) {
-                                printf("R3\n");
-                        } else {
-                                printf("Got button from %s\n", j1850->message);
-                        }
-                } else if( strncmp(header,"72",2)==0 ) {
-			char * data=strndup(j1850->message+2, 8);
-			int odo=((int)strtol(data, NULL, 16) )/8000;
-                        printf("%i : Got odo %i from %s\n", current_time, odo, j1850->message);
-                } else if( strncmp(header,"90",2)==0 ) {
-                        printf("%i : Got metric from %s\n", current_time, j1850->message);
-                } else {
-                        // printf(" ascii: %i [%s] with header [%s]\n",buf, response, header);
-                }
-
-                j1850->message[0]='\0';
-                j1850->index=0;
-        } else {
-                value=buf-48;
-                if(value==-16 || buf == 10 ){
-                        //space and newline, discard
-                        return;
-                } else if (value>16) {
-                        // chars, need to shift down
-                        value-=7;
-                        j1850->message[j1850->index]=buf;
-                        j1850->index++;
-                } else if (buf == '<' ) {
-                        // We have a data error. Let's truncate the message
-                        j1850->message[j1850->index]='\0';
-                        j1850->index++;
-                } else {
-                        j1850->message[j1850->index]=buf;
-                        j1850->index++;
-                }
-                // printf("{%c:%i}", buf,value);
+    struct timeval tv;
+    // Make sure we sent all init commands before trying to read
+    if ( init_string[j1850->init_string_index])
+    {
+        dbg(0,"Sending next init command : %s\n",init_string[j1850->init_string_index]);
+        if (j1850->device > 0 ){
+            write_to_serial_port(init_string[j1850->init_string_index++],j1850->device);
         }
+
+        // Did we reach the last init command?
+        if ( !init_string[j1850->init_string_index])  
+        { 
+            // if yes, switch to idle read instead of timed read
+            event_remove_timeout(j1850->idle);
+            j1850->idle=event_add_idle(125, j1850->callback);
+        }
+        return;
+    }
+    struct attr navit;
+    navit.type=attr_navit;
+    navit.u.navit=j1850->nav;
+
+    // If not connected, generate random messages for debugging purpose
+    if (j1850->device < 0 ){
+	    rand_str(j1850->message,8);
+	    return;
+    }
+    
+    int res;
+    int n;
+    int value;
+    char buf = '\0';
+    n = read( j1850->device, &buf, 1 );
+    if(n == -1) {
+         dbg(1,"x\n");
+    } else if (n==0) {
+         dbg(1,".\n");
+    } else {
+        if( buf == 13 ) {
+    	    gettimeofday(&tv, NULL);
+
+            unsigned long long millisecondsSinceEpoch =
+                (unsigned long long)(tv.tv_sec) * 1000 +
+                (unsigned long long)(tv.tv_usec) / 1000;
+	
+            j1850->message[j1850->index]='\0';
+    		FILE *fp;
+    		fp = fopen(j1850->filename,"a");
+    		fprintf(fp, "%llu,%s\n", millisecondsSinceEpoch, j1850->message);
+    		fclose(fp); 
+            char header[3];
+            strncpy(header, j1850->message, 2);
+            header[2]='\0';
+            if( strncmp(header,"10",2)==0 ) {
+    		    char * w1 =strndup(j1850->message+2, 4);
+    			j1850->rpm = ((int)strtol(w1, NULL, 16) ) / 4 ;
+            } else if( strncmp(header,"3D",2)==0 ) {
+                if (strcmp(j1850->message, "3D110000EE") == 0) {
+                    // noise
+                } else if (strcmp(j1850->message, "3D1120009B") == 0) {
+                    dbg(0,"L1\n");
+    				command_evaluate(&navit, "gui.spotify_volume_up()" );
+                } else if (strcmp(j1850->message, "3D110080C8") == 0) {
+                    dbg(0,"L2\n");
+    				command_evaluate(&navit, "gui.spotify_volume_toggle()" );
+                } else if (strcmp(j1850->message, "3D1110005A") == 0) {
+                    dbg(0,"L3\n");
+    				command_evaluate(&navit, "gui.spotify_volume_down()" );
+                } else if (strcmp(j1850->message, "3D110400C3") == 0) {
+                    dbg(0,"R1\n");
+    				command_evaluate(&navit, "gui.spotify_next_track()" );
+                } else if (strcmp(j1850->message, "3D110002D4") == 0) {
+                    dbg(0,"R2\n");
+    				command_evaluate(&navit, "gui.spotify_toggle()" );
+                } else if (strcmp(j1850->message, "3D11020076") == 0) {
+                    dbg(0,"R3\n");
+    				command_evaluate(&navit, "gui.spotify_previous_track()" );
+                } else {
+                    dbg(0,"Got button from %s\n", j1850->message);
+                }
+            } else if( strncmp(header,"72",2)==0 ) {
+    			char * data=strndup(j1850->message+2, 8);
+    			j1850->odo=((int)strtol(data, NULL, 16) )/8000;
+            } else if( strncmp(header,"90",2)==0 ) {
+            } else if( strncmp(header,"A4",2)==0 ) {
+    		    char * w1 =strndup(j1850->message+2, 4);
+    			j1850->tank_level = ((int)strtol(w1, NULL, 16) ) / 4 ;
+            } else {
+                     // printf(" ascii: %i [%s] with header [%s]\n",buf, response, header);
+            }
+            // Message has been processed. Let's clear it
+            j1850->message[0]='\0';
+            j1850->index=0;
+        } else {
+            value=buf-48;
+            if(value==-16 || buf == 10 ){
+                //space and newline, discard
+                return;
+            } else if (value>16) {
+                // chars, need to shift down
+                value-=7;
+                j1850->message[j1850->index]=buf;
+                j1850->index++;
+            } else if (buf == '<' ) {
+                // We have a data error. Let's truncate the message
+                j1850->message[j1850->index]='\0';
+                j1850->index++;
+            } else {
+                j1850->message[j1850->index]=buf;
+                j1850->index++;
+            }
+            // printf("{%c:%i}", buf,value);
+       }
    }
-   fflush(stdout);
+}
+
+static void
+osd_j1850_draw(struct j1850 *this, struct navit *nav,
+        struct vehicle *v)
+{
+    osd_std_draw(&this->osd_item);
+
+    struct point p, bbox[4];
+
+    graphics_get_text_bbox(this->osd_item.gr, this->osd_item.font, this->message, 0x10000, 0, bbox, 0);
+    p.x=(this->osd_item.w-bbox[2].x)/2;
+    p.y = this->osd_item.h-this->osd_item.h/10;
+
+    struct graphics_gc *curr_color = this->white;
+// online? use  this->bActive?this->white:this->orange;
+    graphics_draw_text(this->osd_item.gr, curr_color, NULL, this->osd_item.font, this->message, &p, 0x10000, 0);
+    graphics_draw_mode(this->osd_item.gr, draw_mode_end);
+}
+
+static void
+osd_j1850_init(struct j1850 *this, struct navit *nav)
+{
+
+    struct color c;
+
+    osd_set_std_graphic(nav, &this->osd_item, (struct osd_priv *)this);
+
+    this->orange = graphics_gc_new(this->osd_item.gr);
+    c.r = 0xFFFF;
+    c.g = 0xA5A5;
+    c.b = 0x0000;
+    c.a = 65535;
+    graphics_gc_set_foreground(this->orange, &c);
+    graphics_gc_set_linewidth(this->orange, this->width);
+
+    this->white = graphics_gc_new(this->osd_item.gr);
+    c.r = 65535;
+    c.g = 65535;
+    c.b = 65535;
+    c.a = 65535;
+    graphics_gc_set_foreground(this->white, &c);
+    graphics_gc_set_linewidth(this->white, this->width);
+
+
+    graphics_gc_set_linewidth(this->osd_item.graphic_fg_white, this->width);
+
+    event_add_timeout(500, 1, callback_new_1(callback_cast(osd_j1850_draw), this));
+
+    j1850_init_serial_port(this);
+
+    // navit_add_callback(nav, this->click_cb = callback_new_attr_1(callback_cast (osd_j1850_click), attr_button, this));
+
+    osd_j1850_draw(this, nav, NULL);
 }
 
 void send_and_read(unsigned char *cmd, int USB)
 {
-// Write
-// unsigned char cmd[] = "ATZ\r";
-int n_written = 0;
+	int n_written = 0;
+	do {
+        n_written += write( USB, &cmd[n_written], 1 );
+    }
+    while (cmd[n_written-1] != '\r' && n_written > 0);
 
-do {
-    n_written += write( USB, &cmd[n_written], 1 );
+    int n = 0;
+    char buf = '\0';
+
+    /* Whole response*/
+    char response[255];
+
+    do
+    {
+       n = read( USB, &buf, 1 );
+       if(n == -1) {
+            dbg(1,"x");
+       } else if (n==0) {
+            dbg(1,".");
+       } else {
+            dbg(1,"[%s]", &buf);
+       }
+    }
+    while( buf != '\r' && n > 0);
+
+    if (n < 0) {
+            dbg(0,"Read error\n");
+    } else if (n == 0) {
+            dbg(0,"Nothing to read?\n");
+    } else {
+            dbg(0,"Response : \n");
+    }
 }
-while (cmd[n_written-1] != '\r' && n_written > 0);
 
-fflush(stdout);
-int n = 0;
-char buf = '\0';
-
-/* Whole response*/
-char response[255];
-
-do
+void
+j1850_init_serial_port(struct j1850 *j1850)
 {
-   n = read( USB, &buf, 1 );
-   if(n == -1) {
-        printf("x");
-        fflush(stdout);
-   } else if (n==0) {
-        printf(".");
-        fflush(stdout);
-   } else {
-        printf("[%s]", &buf);
-        //append(response,255,buf);
-        fflush(stdout);
-   }
-}
-while( buf != '\r' && n > 0);
-// append(response,255,'\0');
+	j1850->callback=callback_new_1(callback_cast(j1850_idle), j1850);
 
-if (n < 0)
-{
-        printf("Read error\n");
-   // cout << "Error reading: " << strerror(errno) << endl;
-}
-   else if (n == 0)
-{
-        printf("Nothing to read?\n");
-    // cout << "Read nothing!" << endl;
-}
-else
-{
-        printf("Response : \n");
-}
-
-  sleep(1);
-}
-
-static void
-j1850_navit_init(struct navit *nav)
-{
-	int USB = open( "/dev/ttyUSB0", O_RDWR| O_NOCTTY );
-	if ( USB < 0 ) 
+	j1850->device = open( "/dev/ttyUSB0", O_RDWR| O_NOCTTY );
+	if ( j1850->device < 0 ) 
 	{
 		dbg(0,"Can't open port\n");
+        j1850->idle=event_add_timeout(100, 1, j1850->callback);
 		return;
 	}
 
@@ -205,7 +325,7 @@ j1850_navit_init(struct navit *nav)
 	memset (&tty, 0, sizeof tty);
 	
 	/* Error Handling */
-	if ( tcgetattr ( USB, &tty ) != 0 )
+	if ( tcgetattr ( j1850->device, &tty ) != 0 )
 	{
 	        dbg(0,"Error\n");
 		return;
@@ -233,37 +353,43 @@ j1850_navit_init(struct navit *nav)
 	cfmakeraw(&tty);
 	
 	/* Flush Port, then applies attributes */
-	tcflush( USB, TCIFLUSH );
-	if ( tcsetattr ( USB, TCSANOW, &tty ) != 0)
+	tcflush( j1850->device, TCIFLUSH );
+	if ( tcsetattr ( j1850->device, TCSANOW, &tty ) != 0)
 	{
-	        dbg(0,"Flush error\n");
+	    dbg(0,"Flush error\n");
 		return;
 	}
 
-	send_and_read("ATZ\r\n", USB);
-	send_and_read("ATI\r\n", USB);
-	send_and_read("ATL1\r\n", USB);
-	send_and_read("ATH1\r\n", USB);
-	send_and_read("ATS1\r\n", USB);
-	send_and_read("ATAL\r\n", USB);
-	send_and_read("ATMA\r\n", USB);
-	struct j1850 *j1850=g_new0(struct j1850, 1);
-	j1850->device=USB;
-	j1850->callback=callback_new_1(callback_cast(j1850_idle), j1850);
-	j1850->idle=event_add_idle(50, j1850->callback);
-	dbg(0,"Init ok\n");
+	dbg(0,"Port init ok\n");
+    // For the init part, we want to wait 1sec before each init string
+    j1850->idle=event_add_timeout(1000, 1, j1850->callback);
 }
 
-static void
-j1850_navit(struct navit *nav, int add)
+static struct osd_priv *
+osd_j1850_new(struct navit *nav, struct osd_methods *meth,
+        struct attr **attrs)
 {
-	dbg(0,"enter\n");
-	struct attr callback;
-	if (add) {
-		callback.type=attr_callback;
-		callback.u.callback=callback_new_attr_0(callback_cast(j1850_navit_init), attr_navit);
-		navit_add_attr(nav, &callback);
-	}
+    struct j1850 *this=g_new0(struct j1850, 1);
+    this->nav=nav;
+    time_t current_time = time(NULL);
+    // FIXME : make sure that the directory we log to exists!
+    this->filename=g_strdup_printf("/home/navit/.navit/obd/%i.log",current_time);
+    dbg(0,"Will log to %s\n", this->filename);
+    this->init_string_index=0;
+    struct attr *attr;
+    this->osd_item.p.x = 120;
+    this->osd_item.p.y = 20;
+    this->osd_item.w = 160;
+    this->osd_item.h = 20;
+    this->osd_item.navit = nav;
+    this->osd_item.font_size = 200;
+    this->osd_item.meth.draw = osd_draw_cast(osd_j1850_draw);
+
+    osd_set_std_attr(attrs, &this->osd_item, 2);
+    attr = attr_search(attrs, NULL, attr_width);
+    this->width=attr ? attr->u.num : 2;
+    navit_add_callback(nav, callback_new_attr_1(callback_cast(osd_j1850_init), attr_graphics_ready, this));
+    return (struct osd_priv *) this;
 }
 
 void
@@ -272,11 +398,5 @@ plugin_init(void)
 	struct attr callback,navit;
 	struct attr_iter *iter;
 
-	callback.type=attr_callback;
-	callback.u.callback=callback_new_attr_0(callback_cast(j1850_navit), attr_navit);
-	config_add_attr(config, &callback);
-	iter=config_attr_iter_new();
-	while (config_get_attr(config, attr_navit, &navit, iter)) 
-		j1850_navit_init(navit.u.navit);
-	config_attr_iter_destroy(iter);	
+	plugin_register_osd_type("j1850", osd_j1850_new);
 }
