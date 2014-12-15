@@ -77,6 +77,16 @@ struct j1850 {
     int odo;
 };
 
+/**
+ * @brief	Generates a fake sentence. Used for debugging
+ * @param[in]	dest	- the char * to which we will write the sentence
+ *              lenght  - the length of the sentence to generate
+ *
+ * @return	nothing
+ *
+ * Generates a fake string to simulate data from the serial port
+ *
+ */
 void rand_str(char *dest, size_t length) {
     char charset[] = "0123456789"
                      "ABCDEF";
@@ -88,6 +98,16 @@ void rand_str(char *dest, size_t length) {
     *dest = '\0';
 }
 
+/**
+ * @brief	Writes 'cmd' to the serial port'
+ * @param[in]	cmd	- the char * that we will write to the serial port
+ *              device  - the serial port device
+ *
+ * @return	nothing
+ *
+ * Write the cmd to the serial port
+ *
+ */
 void write_to_serial_port(unsigned char *cmd, int device)
 {
 	int n_written = 0;
@@ -98,10 +118,28 @@ void write_to_serial_port(unsigned char *cmd, int device)
     dbg(0,"sent %s to the serial port\n",cmd);
 }
 
+/**
+ * @brief	Function called when navit is idle. Does the continous reading
+ * @param[in]	j1850	- the j1850 struct containing the state of the plugin
+ *
+ * @return	nothing
+ *
+ * This is the main function of this plugin. It is called when navit is idle,
+ * and performs the initialization of the obd device if needed, then reads 
+ * one char each time it is called, and puts this char in a buffer. When it 
+ * reads an EOL character, the buffer is parsed, and the appropriate action is
+ * taken. The buffer is then cleared and we start over.
+ *
+ */
 static void
 j1850_idle(struct j1850 *j1850)
 {
-    struct timeval tv;
+    int n;             // used to keep track of the numbers of char read from the device
+    int value;         // used to convert the ascii char to an int
+    char buf = '\0';   // the buffer where we store the char read from the device
+    char header[3];    // a buffer to store the j1850 header for easier matching
+    struct timeval tv; // used to timestamp the logs
+    struct attr navit;
     // Make sure we sent all init commands before trying to read
     if ( init_string[j1850->init_string_index])
     {
@@ -119,7 +157,6 @@ j1850_idle(struct j1850 *j1850)
         }
         return;
     }
-    struct attr navit;
     navit.type=attr_navit;
     navit.u.navit=j1850->nav;
 
@@ -129,10 +166,6 @@ j1850_idle(struct j1850 *j1850)
 	    return;
     }
     
-    int res;
-    int n;
-    int value;
-    char buf = '\0';
     n = read( j1850->device, &buf, 1 );
     if(n == -1) {
          dbg(1,"x\n");
@@ -140,56 +173,54 @@ j1850_idle(struct j1850 *j1850)
          dbg(1,".\n");
     } else {
         if( buf == 13 ) {
-    	    gettimeofday(&tv, NULL);
-
+            gettimeofday(&tv, NULL);
             unsigned long long millisecondsSinceEpoch =
                 (unsigned long long)(tv.tv_sec) * 1000 +
                 (unsigned long long)(tv.tv_usec) / 1000;
 	
             j1850->message[j1850->index]='\0';
-    		FILE *fp;
-    		fp = fopen(j1850->filename,"a");
-    		fprintf(fp, "%llu,%s\n", millisecondsSinceEpoch, j1850->message);
-    		fclose(fp); 
-            char header[3];
+            FILE *fp;
+            fp = fopen(j1850->filename,"a");
+            fprintf(fp, "%llu,%s\n", millisecondsSinceEpoch, j1850->message);
+            fclose(fp); 
             strncpy(header, j1850->message, 2);
             header[2]='\0';
             if( strncmp(header,"10",2)==0 ) {
-    		    char * w1 =strndup(j1850->message+2, 4);
-    			j1850->rpm = ((int)strtol(w1, NULL, 16) ) / 4 ;
+            	char * w1 = strndup(j1850->message+2, 4);
+            	j1850->rpm = ((int)strtol(w1, NULL, 16) ) / 4 ;
             } else if( strncmp(header,"3D",2)==0 ) {
                 if (strcmp(j1850->message, "3D110000EE") == 0) {
                     // noise
                 } else if (strcmp(j1850->message, "3D1120009B") == 0) {
                     dbg(0,"L1\n");
-    				command_evaluate(&navit, "gui.spotify_volume_up()" );
+                    command_evaluate(&navit, "gui.spotify_volume_up()" );
                 } else if (strcmp(j1850->message, "3D110080C8") == 0) {
                     dbg(0,"L2\n");
-    				command_evaluate(&navit, "gui.spotify_volume_toggle()" );
+                    command_evaluate(&navit, "gui.spotify_volume_toggle()" );
                 } else if (strcmp(j1850->message, "3D1110005A") == 0) {
                     dbg(0,"L3\n");
-    				command_evaluate(&navit, "gui.spotify_volume_down()" );
+                    command_evaluate(&navit, "gui.spotify_volume_down()" );
                 } else if (strcmp(j1850->message, "3D110400C3") == 0) {
                     dbg(0,"R1\n");
-    				command_evaluate(&navit, "gui.spotify_next_track()" );
+                    command_evaluate(&navit, "gui.spotify_next_track()" );
                 } else if (strcmp(j1850->message, "3D110002D4") == 0) {
                     dbg(0,"R2\n");
-    				command_evaluate(&navit, "gui.spotify_toggle()" );
+                    command_evaluate(&navit, "gui.spotify_toggle()" );
                 } else if (strcmp(j1850->message, "3D11020076") == 0) {
                     dbg(0,"R3\n");
-    				command_evaluate(&navit, "gui.spotify_previous_track()" );
+                    command_evaluate(&navit, "gui.spotify_previous_track()" );
                 } else {
                     dbg(0,"Got button from %s\n", j1850->message);
                 }
             } else if( strncmp(header,"72",2)==0 ) {
-    			char * data=strndup(j1850->message+2, 8);
-    			j1850->odo=((int)strtol(data, NULL, 16) )/8000;
+            	char * data=strndup(j1850->message+2, 8);
+            	j1850->odo=((int)strtol(data, NULL, 16) )/8000;
             } else if( strncmp(header,"90",2)==0 ) {
             } else if( strncmp(header,"A4",2)==0 ) {
-    		    char * w1 =strndup(j1850->message+2, 4);
-    			j1850->tank_level = ((int)strtol(w1, NULL, 16) ) / 4 ;
+            	char * w1 =strndup(j1850->message+2, 4);
+            	j1850->tank_level = ((int)strtol(w1, NULL, 16) ) / 4 ;
             } else {
-                     // printf(" ascii: %i [%s] with header [%s]\n",buf, response, header);
+                // printf(" ascii: %i [%s] with header [%s]\n",buf, response, header);
             }
             // Message has been processed. Let's clear it
             j1850->message[0]='\0';
@@ -217,6 +248,17 @@ j1850_idle(struct j1850 *j1850)
    }
 }
 
+/**
+ * @brief	Draws the j1850 OSD 
+ * @param[in]	j1850	- the j1850 struct containing the state of the plugin
+ *              nav     - the navit object
+ * 		v	- the vehicle object
+ *
+ * @return	nothing
+ *
+ * Draws the j1850 OSD. Currently it only displays the last parsed message
+ *
+ */
 static void
 osd_j1850_draw(struct j1850 *this, struct navit *nav,
         struct vehicle *v)
@@ -230,19 +272,29 @@ osd_j1850_draw(struct j1850 *this, struct navit *nav,
     p.y = this->osd_item.h-this->osd_item.h/10;
 
     struct graphics_gc *curr_color = this->white;
-// online? use  this->bActive?this->white:this->orange;
+    // online? use  this->bActive?this->white:this->orange;
     graphics_draw_text(this->osd_item.gr, curr_color, NULL, this->osd_item.font, this->message, &p, 0x10000, 0);
     graphics_draw_mode(this->osd_item.gr, draw_mode_end);
 }
 
+/**
+ * @brief	Initialize the j1850 OSD
+ * @param[in]	j1850	- the j1850 struct containing the state of the plugin
+ *              nav     - the navit object
+ *
+ * @return	nothing
+ *
+ * Initialize the j1850 OSD
+ *
+ */
 static void
 osd_j1850_init(struct j1850 *this, struct navit *nav)
 {
 
     struct color c;
-
     osd_set_std_graphic(nav, &this->osd_item, (struct osd_priv *)this);
-
+    
+    // Used when debugging or when the device is offline
     this->orange = graphics_gc_new(this->osd_item.gr);
     c.r = 0xFFFF;
     c.g = 0xA5A5;
@@ -251,6 +303,7 @@ osd_j1850_init(struct j1850 *this, struct navit *nav)
     graphics_gc_set_foreground(this->orange, &c);
     graphics_gc_set_linewidth(this->orange, this->width);
 
+    // Used when we are receiving real datas from the device
     this->white = graphics_gc_new(this->osd_item.gr);
     c.r = 65535;
     c.g = 65535;
@@ -271,10 +324,20 @@ osd_j1850_init(struct j1850 *this, struct navit *nav)
     osd_j1850_draw(this, nav, NULL);
 }
 
+/**
+ * @brief	Sends 'cmd' and reads the reply from the device
+ * @param[in]	cmd	- the char * that we will write to the serial port
+ *              device  - the serial port device
+ *
+ * @return	nothing
+ *
+ * Sends 'cmd' and reads the reply from the device
+ *
+ */
 void send_and_read(unsigned char *cmd, int USB)
 {
-	int n_written = 0;
-	do {
+    int n_written = 0;
+    do {
         n_written += write( USB, &cmd[n_written], 1 );
     }
     while (cmd[n_written-1] != '\r' && n_written > 0);
@@ -307,16 +370,25 @@ void send_and_read(unsigned char *cmd, int USB)
     }
 }
 
+/**
+ * @brief	Opens the serial port and saves state to the j1850 object
+ * @param[in]	j1850	- the j1850 struct containing the state of the plugin
+ *
+ * @return	nothing
+ *
+ * Opens the serial port and saves state to the j1850 object
+ *
+ */
 void
 j1850_init_serial_port(struct j1850 *j1850)
 {
 	j1850->callback=callback_new_1(callback_cast(j1850_idle), j1850);
-
+	// Fixme : we should read the device path from the config file
 	j1850->device = open( "/dev/ttyUSB0", O_RDWR| O_NOCTTY );
 	if ( j1850->device < 0 ) 
 	{
 		dbg(0,"Can't open port\n");
-        j1850->idle=event_add_timeout(100, 1, j1850->callback);
+		j1850->idle=event_add_timeout(100, 1, j1850->callback);
 		return;
 	}
 
@@ -356,15 +428,26 @@ j1850_init_serial_port(struct j1850 *j1850)
 	tcflush( j1850->device, TCIFLUSH );
 	if ( tcsetattr ( j1850->device, TCSANOW, &tty ) != 0)
 	{
-	    dbg(0,"Flush error\n");
+		dbg(0,"Flush error\n");
 		return;
 	}
 
 	dbg(0,"Port init ok\n");
-    // For the init part, we want to wait 1sec before each init string
-    j1850->idle=event_add_timeout(1000, 1, j1850->callback);
+    	// For the init part, we want to wait 1sec before each init string
+    	j1850->idle=event_add_timeout(1000, 1, j1850->callback);
 }
 
+/**
+ * @brief	Creates the j1850 OSD and set some default properties
+ * @param[in]	nav	- the navit object
+ *              meth    - the osd_methods
+ * 		attrs	- pointer to the attributes
+ *
+ * @return	nothing
+ *
+ * Creates the j1850 OSD and set some default properties
+ *
+ */
 static struct osd_priv *
 osd_j1850_new(struct navit *nav, struct osd_methods *meth,
         struct attr **attrs)
@@ -392,6 +475,14 @@ osd_j1850_new(struct navit *nav, struct osd_methods *meth,
     return (struct osd_priv *) this;
 }
 
+/**
+ * @brief	The plugin entry point
+ *
+ * @return	nothing
+ *
+ * The plugin entry point
+ *
+ */
 void
 plugin_init(void)
 {
