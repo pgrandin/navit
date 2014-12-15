@@ -18,6 +18,12 @@
  * Boston, MA  02110-1301, USA.
  */
 
+/* 
+   This plugin implements a small subset of the SAE j1850 protocal used in some cars.
+   So far the code assumes that it is run on Linux. It allows Navit to read the steering
+   wheel inputs and some metrics like RPM or the fuel tank level
+   */
+
 #include <math.h>
 #include <stdio.h>
 #include <glib.h>
@@ -58,18 +64,18 @@ const char *init_string[] = {
 };
 
 struct j1850 {
-	struct navit *nav;
-	int status;
-	int device;
-	int index;
-	char message[255];
-	char * filename;
-	struct event_idle *idle;
-	struct callback *callback;
-  	struct osd_item osd_item;
-   	int width;
-   	struct graphics_gc *orange,*white;
-   	struct callback *click_cb;
+    struct navit *nav;
+    int status;
+    int device;
+    int index;
+    char message[255];
+    char * filename;
+    struct event_idle *idle;
+    struct callback *callback;
+    struct osd_item osd_item;
+    int width;
+    struct graphics_gc *orange,*white;
+    struct callback *click_cb;
     int init_string_index;
 
     int rpm;
