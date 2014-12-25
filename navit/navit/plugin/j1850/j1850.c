@@ -1,7 +1,7 @@
 /* vim: set tabstop=4 expandtab: */
 /**
  * Navit, a modular navigation system.
- * Copyright (C) 2005-2008 Navit Team
+ * Copyright (C) 2005-2014 Navit Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -78,7 +78,9 @@ struct j1850 {
     struct callback *click_cb;
     int init_string_index;
 
-    int rpm;
+    int engine_rpm;
+    int trans_rpm;
+    int map;
     int tank_level;
     int odo;
 };
@@ -192,8 +194,12 @@ j1850_idle(struct j1850 *j1850)
             strncpy(header, j1850->message, 2);
             header[2]='\0';
             if( strncmp(header,"10",2)==0 ) {
-            	char * w1 = strndup(j1850->message+2, 4);
-            	j1850->rpm = ((int)strtol(w1, NULL, 16) ) / 4 ;
+            	char * w1 = strndup(j1850->message+2, 2);
+            	char * w2 = strndup(j1850->message+4, 2);
+            	char * w3 = strndup(j1850->message+6, 2);
+            	j1850->engine_rpm = ((int)strtol(w1, NULL, 16) ) / 4 ;
+            	j1850->trans_rpm  = ((int)strtol(w2, NULL, 16) ) / 4 ;
+            	j1850->map        =  (int)strtol(w3, NULL, 16);
             } else if( strncmp(header,"3D",2)==0 ) {
                 if (strcmp(j1850->message, "3D110000EE") == 0) {
                     // noise
