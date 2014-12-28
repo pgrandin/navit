@@ -1,15 +1,15 @@
 if(USE_SPOTIFY)
 	set(spotify_LIBS "-lspotify -lasound -lpthread")
 	set(spotify_sources gui_internal_spotify.c spotify/audio.c
-	spotify/alsa-audio.c api_keys.c)
+	spotify/alsa-audio.c )
 endif(USE_SPOTIFY)
 if(USE_GOOGLEPLACES)
 	set(api_LIBS "-ljansson -lpthread -lcurl")
-	set(googleplaces_sources gui_internal_googlesearch.c network.c api_keys.c)
+	set(googleplaces_sources gui_internal_googlesearch.c )
 endif(USE_GOOGLEPLACES)
 if(USE_FOURSQUARE)
 	set(api_LIBS "-ljansson -lpthread -lcurl")
-	set(fourquare_sources gui_internal_foursquare.c network.c api_keys.c)
+	set(fourquare_sources gui_internal_foursquare.c )
 endif(USE_FOURSQUARE)
 set(gui_internal_LIBS ${spotify_LIBS} ${api_LIBS})
 module_add_library(gui_internal gui_internal.c gui_internal_bookmark.c
