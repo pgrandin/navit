@@ -75,6 +75,9 @@
 #ifdef HAVE_API_WIN32_CE
 #include "libc.h"
 #endif
+#ifdef USE_SPOTIFY
+#include "spotify.h"
+#endif
 
 /* define string for bookmark handling */
 #define TEXTFILE_COMMENT_NAVI_STOPPED "# navigation stopped\n"
@@ -2150,6 +2153,8 @@ navit_init(struct navit *this_)
 #if 0
 	routech_test(this_);
 #endif
+	spotify_set_attr(this_->gui);
+	spotify_navit_init (this_);
 }
 
 void
