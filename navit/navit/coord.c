@@ -104,7 +104,7 @@ coord_rect_overlap(struct coord_rect *r1, struct coord_rect *r2)
 	dbg_assert(r1->lu.y >= r1->rl.y);
 	dbg_assert(r2->lu.x <= r2->rl.x);
 	dbg_assert(r2->lu.y >= r2->rl.y);
-	dbg(3,"0x%x,0x%x - 0x%x,0x%x vs 0x%x,0x%x - 0x%x,0x%x\n", r1->lu.x, r1->lu.y, r1->rl.x, r1->rl.y, r2->lu.x, r2->lu.y, r2->rl.x, r2->rl.y);
+	dbg(lvl_debug,"0x%x,0x%x - 0x%x,0x%x vs 0x%x,0x%x - 0x%x,0x%x\n", r1->lu.x, r1->lu.y, r1->rl.x, r1->rl.y, r2->lu.x, r2->lu.y, r2->rl.x, r2->rl.y);
 	if (r1->lu.x > r2->rl.x)
 		return 0;
 	if (r1->rl.x < r2->lu.x)
@@ -146,51 +146,47 @@ coord_rect_extend(struct coord_rect *r, struct coord *c)
 }
 
 /**
- * Parses \c char \a *c_str and writes back the coordinates to \c coord \a *c_ret. Uses \c projection \a pro if no projection is given in \c char \a *c_str.
- * The format for \a *c_str can be: 
- * 	\li [Proj:]-0xX [-]0xX 
- * 	    - where Proj can be mg/garmin, defaults to mg
- * 	\li [Proj:][D][D]Dmm.ss[S][S] N/S [D][D]DMM.ss[S][S]... E/W
- * 	\li [Proj:][-][D]D.d[d]... [-][D][D]D.d[d]
- * 	    - where Proj can be geo
+ * Parses \c char \a *coord_input and writes back the coordinates to \c coord \a *result, using \c projection \a output_projection.
+ * \a *coord_input may specify its projection at the beginning.
+ * The format for \a *coord_input can be:
+ * 	\li [Proj:][-]0xXX.... [-]0xXX... - Mercator coordinates, hex integers (XX), Proj can be "mg" or "garmin", defaults to mg
+ * 	\li [Proj:][D][D]Dmm.mm.. N/S [D][D]DMM.mm... E/W - lat/long (WGS 84), integer degrees (DD) and minutes as decimal fraction (MM), Proj must be "geo" or absent
+ * 	\li [Proj:][-][D]D.d[d]... [-][D][D]D.d[d] - long/lat (WGS 84, note order!), degrees as decimal fraction, Proj does not matter
+ * 	\li utm[zoneinfo]:[-][D]D.d[d]... [-][D][D]D.d[d] - UTM coordinates, as decimal fraction, with optional zone information (?)
+ * Note that the spaces are relevant for parsing.
  *
- * @param *c_str String to be parsed
- * @param pro Projection of the string
- * @param *pc_ret Where the \a pcoord should get stored
+ * @param *coord_input String to be parsed
+ * @param output_projection Desired projection of the result
+ * @param *result For returning result
  * @returns The lenght of the parsed string
  */
 
 int
-coord_parse(const char *c_str, enum projection pro, struct coord *c_ret)
+coord_parse(const char *coord_input, enum projection output_projection, struct coord *result)
 {
-	int debug=0;
 	char *proj=NULL,*s,*co;
-	const char *str=c_str;
+	const char *str=coord_input;
 	int args,ret = 0;
 	struct coord_geo g;
 	struct coord c,offset;
 	enum projection str_pro=projection_none;
 
-	dbg(1,"enter('%s',%d,%p)\n", c_str, pro, c_ret);
+	dbg(lvl_debug,"enter('%s',%d,%p)\n", coord_input, output_projection, result);
 	s=strchr(str,' ');
 	co=strchr(str,':');
 	if (co && co < s) {
 		proj=malloc(co-str+1);
 		strncpy(proj, str, co-str);
 		proj[co-str]='\0';
-		dbg(1,"projection=%s\n", proj);
+		dbg(lvl_debug,"projection=%s\n", proj);
 		str=co+1;
 		s=strchr(str,' ');
-		if (!strcmp(proj, "mg"))
-			str_pro = projection_mg;
-		else if (!strcmp(proj, "garmin"))
-			str_pro = projection_garmin;
-		else if (!strcmp(proj, "geo"))
+		if (!strcmp(proj, "geo"))
 			str_pro = projection_none;
 		else {
 			str_pro = projection_from_name(proj,&offset);
 			if (str_pro == projection_none) {
-				dbg(0, "Unknown projection: %s\n", proj);
+				dbg(lvl_error, "Unknown projection: %s\n", proj);
 				goto out;
 			}
 		}
@@ -206,26 +202,26 @@ coord_parse(const char *c_str, enum projection pro, struct coord *c_ret)
 		args=sscanf(str, "%i %i%n",&c.x, &c.y, &ret);
 		if (args < 2)
 			goto out;
-		dbg(1,"str='%s' x=0x%x y=0x%x c=%d\n", str, c.x, c.y, ret);
-		dbg(1,"rest='%s'\n", str+ret);
+		dbg(lvl_debug,"str='%s' x=0x%x y=0x%x c=%d\n", str, c.x, c.y, ret);
+		dbg(lvl_debug,"rest='%s'\n", str+ret);
 
 		if (str_pro == projection_none) 
 			str_pro=projection_mg;
-		if (str_pro != pro) {
+		if (str_pro != output_projection) {
 			transform_to_geo(str_pro, &c, &g);
-			transform_from_geo(pro, &g, &c);
+			transform_from_geo(output_projection, &g, &c);
 		}
-		*c_ret=c;
+		*result=c;
 	} else if (*s == 'N' || *s == 'n' || *s == 'S' || *s == 's') {
 		double lng, lat;
 		char ns, ew;
-		dbg(1,"str='%s'\n", str);
+		dbg(lvl_debug,"str='%s'\n", str);
 		args=sscanf(str, "%lf %c %lf %c%n", &lat, &ns, &lng, &ew, &ret);
-		dbg(1,"args=%d\n", args);
-		dbg(1,"lat=%f %c lon=%f %c\n", lat, ns, lng, ew);
+		dbg(lvl_debug,"args=%d\n", args);
+		dbg(lvl_debug,"lat=%f %c lon=%f %c\n", lat, ns, lng, ew);
 		if (args < 4)
 			goto out;
-		dbg(1,"projection=%d str_pro=%d projection_none=%d\n", pro, str_pro, projection_none);
+		dbg(lvl_debug,"projection=%d str_pro=%d projection_none=%d\n", output_projection, str_pro, projection_none);
 		if (str_pro == projection_none) {
 			g.lat=floor(lat/100);
 			lat-=g.lat*100;
@@ -237,53 +233,45 @@ coord_parse(const char *c_str, enum projection pro, struct coord *c_ret)
 				g.lat=-g.lat;
 			if (ew == 'w' || ew == 'W')
 				g.lng=-g.lng;
-			dbg(1,"transform_from_geo(%f,%f)",g.lat,g.lng);
-			transform_from_geo(pro, &g, c_ret);
-			dbg(1,"result 0x%x,0x%x\n", c_ret->x,c_ret->y);
+			dbg(lvl_debug,"transform_from_geo(%f,%f)",g.lat,g.lng);
+			transform_from_geo(output_projection, &g, result);
+			dbg(lvl_debug,"result 0x%x,0x%x\n", result->x,result->y);
 		}
-		dbg(3,"str='%s' x=%f ns=%c y=%f ew=%c c=%d\n", str, lng, ns, lat, ew, ret);
-		dbg(3,"rest='%s'\n", str+ret);
-	} else if (str_pro == projection_utm || str_pro == projection_gk) {
+		dbg(lvl_debug,"str='%s' x=%f ns=%c y=%f ew=%c c=%d\n", str, lng, ns, lat, ew, ret);
+		dbg(lvl_debug,"rest='%s'\n", str+ret);
+	} else if (str_pro == projection_utm) {
 		double x,y;
 		args=sscanf(str, "%lf %lf%n", &x, &y, &ret);
 		if (args < 2)
 			goto out;
 		c.x=x+offset.x;
 		c.y=y+offset.y;
-		if (str_pro != pro) {
+		if (str_pro != output_projection) {
 			transform_to_geo(str_pro, &c, &g);
-			transform_from_geo(pro, &g, &c);
+			transform_from_geo(output_projection, &g, &c);
 		}
-		*c_ret=c;
+		*result=c;
 	} else {
 		double lng, lat;
 		args=sscanf(str, "%lf %lf%n", &lng, &lat, &ret);
 		if (args < 2)
 			goto out;
-		dbg(1,"str='%s' x=%f y=%f  c=%d\n", str, lng, lat, ret);
-		dbg(1,"rest='%s'\n", str+ret);
+		dbg(lvl_debug,"str='%s' x=%f y=%f  c=%d\n", str, lng, lat, ret);
+		dbg(lvl_debug,"rest='%s'\n", str+ret);
 		g.lng=lng;
 		g.lat=lat;
-		transform_from_geo(pro, &g, c_ret);
+		transform_from_geo(output_projection, &g, result);
 	}
-	if (debug)
-		printf("rest='%s'\n", str+ret);
-	ret+=str-c_str;
-	if (debug) {
-		printf("args=%d\n", args);
-		printf("ret=%d delta=%d ret_str='%s'\n", ret, GPOINTER_TO_INT(str-c_str), c_str+ret);
-	}
+	ret+=str-coord_input;
+	dbg(lvl_info, "ret=%d delta=%d ret_str='%s'\n", ret, GPOINTER_TO_INT(str-coord_input), coord_input+ret);
 out:
 	free(proj);
 	return ret;
 }
 
 /**
- * A wrapper for pcoord_parse that also return the projection
- * @param *c_str String to be parsed
- * @param pro Projection of the string
- * @param *pc_ret Where the \a pcoord should get stored
- * @returns The lenght of the parsed string
+ * A wrapper for coord_parse that also returns the projection.
+ * For parameters see coord_parse.
  */
 
 int

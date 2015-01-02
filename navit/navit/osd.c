@@ -70,7 +70,7 @@ osd_new(struct attr *parent, struct attr **attrs)
 		g_free(o);
 		o=NULL;
 	}
-	dbg(3,"new osd %p\n",o);
+	dbg(lvl_debug,"new osd %p\n",o);
         return o;
 }
 
@@ -128,7 +128,7 @@ osd_evaluate_command(struct osd_item *this, struct navit *nav)
 	struct attr navit;
 	navit.type=attr_navit;
 	navit.u.navit=nav;
-	dbg(1, "calling command '%s'\n", this->command);
+	dbg(lvl_debug, "calling command '%s'\n", this->command);
 	command_evaluate(&navit, this->command);
 }
 
@@ -158,31 +158,61 @@ osd_std_resize(struct osd_item *item)
  	graphics_overlay_resize(item->gr, &item->p, item->w, item->h, 65535, 1);
 }
  
-static void
-osd_std_calculate_sizes(struct osd_item *item, struct osd_priv *priv, int w, int h) 
+/**
+ * @brief Calculates the size and position of an OSD item.
+ *
+ * If the geometry of the OSD item is specified relative to screen dimensions,
+ * this function will set its absolute dimensions accordingly.
+ * @param item
+ * @param w Available screen width in pixels (the width that corresponds to
+ * 100%)
+ * @param h Available screen height in pixels (the height that corresponds to
+ * 100%)
+ */
+void
+osd_std_calculate_sizes(struct osd_item *item, int w, int h)
 {
-	struct attr vehicle_attr;
-
  	if (item->rel_w) {
 		item->w = (item->rel_w * w) / 100;
  	}
- 
+
  	if (item->rel_h) {
 		item->h = (item->rel_h * h) / 100;
  	}
- 
+
  	if (item->rel_x) {
 		item->p.x = (item->rel_x * w) / 100;
  	}
- 
+
  	if (item->rel_y) {
 		item->p.y = (item->rel_y * h) / 100;
  	}
+}
+
+/**
+ * @brief Recalculates the size and position of an OSD item and
+ * triggers a redraw of the item.
+ *
+ * @param item
+ * @param priv
+ * @param w Available screen width in pixels (the width that corresponds to
+ * 100%)
+ * @param h Available screen height in pixels (the height that corresponds to
+ * 100%)
+ */
+static void
+osd_std_calculate_sizes_and_redraw(struct osd_item *item, struct osd_priv *priv, int w, int h)
+{
+	struct attr vehicle_attr;
+
+	osd_std_calculate_sizes(item, w, h);
 
 	osd_std_resize(item);
+	item->do_draw=1;
 	if (item->meth.draw) {
 		if (navit_get_attr(item->navit, attr_vehicle, &vehicle_attr, NULL)) {
 			item->meth.draw(priv, item->navit, vehicle_attr.u.vehicle);
+			item->do_draw=0;
 		}
 	}
 }
@@ -192,12 +222,12 @@ osd_std_keypress(struct osd_item *item, struct navit *nav, char *key)
 {
 #if 0
 	int i;
-	dbg(0,"key=%s\n",key);
+	dbg(lvl_debug,"key=%s\n",key);
 	for (i = 0 ; i < strlen(key) ; i++) {
-		dbg(0,"key:0x%02x\n",key[i]);
+		dbg(lvl_debug,"key:0x%02x\n",key[i]);
 	}
 	for (i = 0 ; i < strlen(item->accesskey) ; i++) {
-		dbg(0,"accesskey:0x%02x\n",item->accesskey[i]);
+		dbg(lvl_debug,"accesskey:0x%02x\n",item->accesskey[i]);
 	}
 #endif
 	if ( ! graphics_is_disabled(item->gr) && item->accesskey && key && !strcmp(key, item->accesskey)) 
@@ -212,7 +242,7 @@ osd_std_reconfigure(struct osd_item *item, struct command_saved *cs)
 		if (item->gr && !(item->flags & 16)) 
 			graphics_overlay_disable(item->gr, !item->configured);
 	} else {
-		dbg(0, "Error in saved command: %i\n", command_saved_error(cs));
+		dbg(lvl_error, "Error in saved command: %i\n", command_saved_error(cs));
 	}
 }
 
@@ -320,7 +350,7 @@ void
 osd_std_config(struct osd_item *item, struct navit *navit)
 {
 	struct attr attr;
-	dbg(1,"enter\n");
+	dbg(lvl_debug,"enter\n");
 	if (item->enable_cs) {
 		item->reconfig_cb = callback_new_1(callback_cast(osd_std_reconfigure), item);
 		command_saved_set_cb(item->enable_cs, item->reconfig_cb);
@@ -328,7 +358,7 @@ osd_std_config(struct osd_item *item, struct navit *navit)
 		if (!command_saved_error(item->enable_cs)) {
 			item->configured = !! command_saved_get_int(item->enable_cs);
 		} else {
-			dbg(0, "Error in saved command: %i.\n", command_saved_error(item->enable_cs));
+			dbg(lvl_error, "Error in saved command: %i.\n", command_saved_error(item->enable_cs));
 		}
 	} else {
 		if (!navit_get_attr(navit, attr_osd_configuration, &attr, NULL))
@@ -351,7 +381,7 @@ void
 osd_set_keypress(struct navit *nav, struct osd_item *item)
 {
 	struct graphics *navit_gr = navit_get_graphics(nav);
-	dbg(2,"accesskey %s\n",item->accesskey);
+	dbg(lvl_info,"accesskey %s\n",item->accesskey);
 	if (item->accesskey) {
 		item->keypress_cb=callback_new_attr_2(callback_cast(osd_std_keypress), attr_keypress, item, nav);
 		graphics_add_callback(navit_gr, item->keypress_cb);
@@ -364,6 +394,7 @@ osd_set_std_graphic(struct navit *nav, struct osd_item *item, struct osd_priv *p
 	struct graphics *navit_gr;
 
 	navit_gr = navit_get_graphics(nav);
+	osd_std_calculate_sizes(item, navit_get_width(nav), navit_get_height(nav));
 	item->gr = graphics_overlay_new(navit_gr, &item->p, item->w, item->h, 65535, 1);
 
 	item->graphic_bg = graphics_gc_new(item->gr);
@@ -381,7 +412,7 @@ osd_set_std_graphic(struct navit *nav, struct osd_item *item, struct osd_priv *p
 
 	osd_set_std_config(nav, item);
 
-	item->resize_cb = callback_new_attr_2(callback_cast(osd_std_calculate_sizes), attr_resize, item, priv);
+	item->resize_cb = callback_new_attr_2(callback_cast(osd_std_calculate_sizes_and_redraw), attr_resize, item, priv);
 	graphics_add_callback(navit_gr, item->resize_cb);
 	osd_set_keypress(nav, item);
 }
