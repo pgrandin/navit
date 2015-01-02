@@ -422,7 +422,10 @@ add_feature(USE_FOURSQUARE "default" FALSE)
 if (LIBSPOTIFY_FOUND) 
 	if (ALSA_FOUND)
 		set_with_reason(USE_SPOTIFY "libspotify and alsa found" TRUE)
-		SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -u spotify_apikey_size ")
+		SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -u spotify_apikey_size -u audio_volume")
+		# FIXME : this is a bad way to do it as maptool also gets
+		# linked
+		list(APPEND NAVIT_LIBS "-lasound -lspotify -lpthread -ljansson")
 	else (ALSA_FOUND)
 		set_with_reason(USE_SPOTIFY "alsa not found" FALSE)
 	endif (ALSA_FOUND)
