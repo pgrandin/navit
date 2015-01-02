@@ -1,6 +1,6 @@
-/**
+/*
  * Navit, a modular navigation system.
- * Copyright (C) 2005-2009 Navit Team
+ * Copyright (C) 2005-2014 Navit Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public License
@@ -15,6 +15,15 @@
  * License along with this program; if not, write to the
  * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA  02110-1301, USA.
+ */
+
+/** @file attr_def.h
+ * @brief Attribute definitions.
+ * 
+ * Any attribute used by a Navit object must be defined in this file.
+ *
+ * @author Navit Team
+ * @date 2005-2014
  */
 
 /* prototypes */
@@ -187,11 +196,11 @@ ATTR(autozoom_max)
 ATTR2(0x00027500,type_rel_abs_begin)
 /* These attributes are int that can either hold relative		*
  * or absolute values. A relative value is indicated by 		*
- * adding 0x60000000.																				*
- *																													*
+ * adding 0x60000000.											*
+ *																*
  * The range of valid absolute values is -0x40000000 to			*
- * 0x40000000, the range of relative values is from					*
- * -0x20000000 to 0x20000000.																*/
+ * 0x40000000, the range of relative values is from				*
+ * -0x20000000 to 0x20000000.									*/
 ATTR(h)
 ATTR(w)
 ATTR(x)
@@ -380,6 +389,11 @@ ATTR(refresh_cond)
  * exclude the end nodes, because these are imported as separate nodes. */
 ATTR(house_number_interpolation_no_ends_incrmt_1)
 ATTR(house_number_interpolation_no_ends_incrmt_2)
+ATTR(dbg_level)
+ATTR(street_name_systematic_nat)
+ATTR(street_name_systematic_int)
+ATTR(street_destination)
+ATTR(exit_to)
 ATTR(spotify_login)
 ATTR(spotify_password)
 ATTR(spotify_playlist)
