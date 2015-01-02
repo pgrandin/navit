@@ -88,9 +88,6 @@
 #include "gui_internal_gesture.h"
 #include "gui_internal_poi.h"
 #include "gui_internal_command.h"
-#ifdef USE_SPOTIFY
-#include "gui_internal_spotify.h"
-#endif
 #ifdef USE_FOURSQUARE
 #include "gui_internal_foursquare.h"
 #endif
@@ -3322,10 +3319,6 @@ static struct gui_priv * gui_internal_new(struct navit *nav, struct gui_methods 
 	if( (attr=attr_search(attrs,NULL,attr_font)))
 		this->font_name=g_strdup(attr->u.str);
 
-#ifdef USE_SPOTIFY
-        spotify_set_attr(attrs);
-        spotify_navit_init();
-#endif
 	this->data.priv=this;
 	this->data.gui=&gui_internal_methods_ext;
 	this->data.widget=&gui_internal_widget_methods;
