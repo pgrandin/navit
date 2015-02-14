@@ -16,5 +16,6 @@ dependencies:
     - mkdir -p ~/docker; docker save navit/circleci > ~/docker/image.tar
 #  pre:
 #    - sudo apt-get install cmake zlib1g-dev libpng12-dev libgtk2.0-dev librsvg2-bin g++
-
-
+test:
+  post:
+    - curl --retry 10 --retry-delay 5 -v http://www.google.com
