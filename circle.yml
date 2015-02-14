@@ -11,7 +11,7 @@ dependencies:
     - "~/docker"
   override:
     - if [[ -e ~/docker/image.tar ]]; then docker load -i ~/docker/image.tar; fi
-    - docker build -t navit/circleci docker
+    - docker build -t navit/circleci .
     - mkdir -p ~/docker; docker save circleci/elasticsearch > ~/docker/image.tar
   pre:
     - sudo apt-get install cmake zlib1g-dev libpng12-dev libgtk2.0-dev librsvg2-bin g++
