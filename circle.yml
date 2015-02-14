@@ -3,6 +3,7 @@ machine:
     - docker
 dependencies:
   pre:
+    - wget -c -O ~/assets/cov-analysis-linux64-7.6.0.tar.gz http://sd-55475.dedibox.fr/cov-analysis-linux64-7.6.0.tar.gz
 #    - sudo apt-get install cmake zlib1g-dev libpng12-dev libgtk2.0-dev librsvg2-bin g++
 #    - sudo apt-get upgrade
     - sudo apt-get install cmake 
