@@ -3,7 +3,7 @@ machine:
     - docker
   pre:
     - mkdir ~/assets/
-    - curl -k -L -o ~/assets/california-latest.osm.bz2 http://download.geofabrik.de/north-america/us/california-latest.osm.bz2
+    - curl -k -L -o ~/assets/california-latest.osm.bz2 http://sd-55475.dedibox.fr/california-latest.osm.bz2
 #    - curl -k -L -o ~/assets/planet-150202.osm.bz2 ftp://ftp.spline.de/pub/openstreetmap/planet/2015/planet-150202.osm.bz2
 #    - cd ~/assets/ && bunzip2 -vv -k planet-150202.osm.bz2
 dependencies:
