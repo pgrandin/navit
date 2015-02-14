@@ -1,4 +1,6 @@
 machine:
+  services:
+    - docker
   pre:
     - mkdir ~/assets/
     - curl -k -L -o ~/assets/planet-150202.osm.bz2 ftp://ftp.spline.de/pub/openstreetmap/planet/2015/planet-150202.osm.bz2
