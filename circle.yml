@@ -17,10 +17,10 @@ dependencies:
   cache_directories:
     - "~/assets/"
     - "~/docker"
-  override:
-    - if [[ -e ~/docker/image.tar ]]; then docker load -i ~/docker/image.tar; fi
-    - docker build -t navit/circleci .
-    - mkdir -p ~/docker; docker save navit/circleci > ~/docker/image.tar
+#  override:
+#    - if [[ -e ~/docker/image.tar ]]; then docker load -i ~/docker/image.tar; fi
+#    - docker build -t navit/circleci .
+#    - mkdir -p ~/docker; docker save navit/circleci > ~/docker/image.tar
 test:
   post:
     - DISPLAY=:99 ~/navit/bin/navit/navit
