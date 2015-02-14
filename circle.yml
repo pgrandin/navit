@@ -2,6 +2,18 @@ machine:
   services:
     - docker
 dependencies:
+  pre:
+#    - sudo apt-get install cmake zlib1g-dev libpng12-dev libgtk2.0-dev librsvg2-bin g++
+#    - sudo apt-get upgrade
+    - sudo apt-get install cmake 
+#    - sudo apt-get install zlib1g-dev
+    - sudo apt-get install libpng12-dev 
+    - sudo apt-get install libgtk2.0-dev 
+    - sudo apt-get install librsvg2-bin 
+    - sudo apt-get install g++
+    - ls 
+    - ls navit
+    - bash ~/navit/build.sh
   cache_directories:
     - "~/assets/"
     - "~/docker"
@@ -9,8 +21,6 @@ dependencies:
     - if [[ -e ~/docker/image.tar ]]; then docker load -i ~/docker/image.tar; fi
     - docker build -t navit/circleci .
     - mkdir -p ~/docker; docker save navit/circleci > ~/docker/image.tar
-#  pre:
-#    - sudo apt-get install cmake zlib1g-dev libpng12-dev libgtk2.0-dev librsvg2-bin g++
 test:
   post:
     - DISPLAY=:99 ~/navit/bin/navit/navit
