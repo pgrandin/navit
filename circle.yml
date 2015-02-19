@@ -1,6 +1,10 @@
-#machine:
+machine:
 #  services:
 #    - docker
+  post:
+    - cd ~/navit/navit/bin/navit/ && ./navit:
+      background: true
+    - sleep 5
 dependencies:
   pre:
     - wget -c -O ~/assets/cov-analysis-linux64-7.6.0.tar.gz http://sd-55475.dedibox.fr/cov-analysis-linux64-7.6.0.tar.gz
@@ -31,9 +35,6 @@ dependencies:
 test:
   post:
     - cd ~/navit/navit/bin/navit/ && sed -i -e 's@libbinding_dbus.so" active="no"@libbinding_dbus.so" active="yes"@' navit.xml
-    - cd ~/navit/navit/bin/navit/ && ./navit:
-      background: true
-    - sleep 5
     - import -window root ~/assets/default.png
     - pkill navit
 #    - DISPLAY=:99 dbus-send  --print-reply --session --dest=org.navit_project.navit /org/navit_project/navit/default_navit org.navit_project.navit.gui.command string:"quit()"
