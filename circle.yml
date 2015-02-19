@@ -17,3 +17,7 @@ dependencies:
     - bash ~/navit/build.sh
   cache_directories:
     - "~/assets/"
+test:
+  post:
+    - ./navit:
+        pwd: ~/navit/navit/bin/navit/
