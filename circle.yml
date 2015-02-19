@@ -20,9 +20,9 @@ dependencies:
     - "~/assets/"
 test:
   post:
-    - sed -i -e 's@name="Local GPS" profilename="car" enabled="yes" active="1"@name="Local GPS" profilename="car" enabled="no" active="0"@' navit.xml
+    - sed -i -e 's@name="Local GPS" profilename="car" enabled="yes" active="1"@name="Local GPS" profilename="car" enabled="no" active="0"@' navit.xml:
         pwd: navit/bin/navit/
-    - sed -i -e 's@name="Demo" profilename="car" enabled="no" active="yes"@name="Demo" profilename="car" enabled="yes" active="yes" follow="1" refresh="1"@' navit.xml
+    - sed -i -e 's@name="Demo" profilename="car" enabled="no" active="yes"@name="Demo" profilename="car" enabled="yes" active="yes" follow="1" refresh="1"@' navit.xml:
         pwd: navit/bin/navit/
     - sed -i -e 's@type="internal" enabled@type="internal" fullscreen="1" font_size="350" enabled@' navit.xml:
         pwd: navit/bin/navit/
