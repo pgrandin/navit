@@ -30,4 +30,5 @@ dependencies:
 #    - mkdir -p ~/docker; docker save navit/circleci > ~/docker/image.tar
 test:
   post:
+    - cd ~/navit/navit/bin/navit/ && sed -i -e 's@libbinding_dbus.so" active="no"@libbinding_dbus.so" active="yes"@' navit.xml
     - cd ~/navit/navit/bin/navit/ && DISPLAY=:99 ./navit
