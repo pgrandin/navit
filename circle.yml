@@ -20,4 +20,4 @@ dependencies:
 test:
   post:
     - ./navit:
-        pwd: ~/navit/navit/navit/bin/navit/
+        pwd: navit/bin/navit/
