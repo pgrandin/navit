@@ -1,19 +1,19 @@
-tmux new-session -s "compute-${rack}" -n "compute-${rack}" -d
+tmux new-session -s "navit-tests" -n "navit-tests" -d
 for i in 1 2; do
-  tmux new-window -t "compute-${rack}:$i" -n "cpt-$i"
+  tmux new-window -t "navit-tests:$i" -n "cpt-$i"
 done
 
-tmux select-window -t "compute-${rack}:1"
+tmux select-window -t "navit-tests:1"
 
 
 i=1
-tmux send-keys -t :cpt-$i "cd ~/navit/navit/bin/navit/ && DISPLAY=:99 ./navit; exit" Enter
+tmux send-keys -t :cpt-$i "cd ~/navit/navit/bin/navit/ && ./navit; exit" Enter
 tmux select-layout tiled
 
 i=2
-tmux send-keys -t :cpt-$i "sleep 5; sleep 5 && DISPLAY=:99 import -window root ~/assets/default.png; pkill navit; tmux kill-session" Enter
+tmux send-keys -t :cpt-$i "sleep 5; import -window root ~/assets/default.png; pkill navit; tmux kill-session" Enter
 tmux join-pane -s :cpt-$i
 tmux select-layout tiled
 
 #tmux set-window-option synchronize-panes
-tmux -2 attach-session -t "compute-${rack}"
+tmux -2 attach-session -t "navit-tests"
