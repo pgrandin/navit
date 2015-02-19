@@ -25,5 +25,5 @@ test:
         pwd: navit/bin/navit/
         background: true
     - sleep 5
-    - import -window root ~/assets/default.png
+    - import -window root $CIRCLE_ARTIFACTS/default.png
     - dbus-send  --print-reply --session --dest=org.navit_project.navit /org/navit_project/navit/default_navit org.navit_project.navit.navit.quit
