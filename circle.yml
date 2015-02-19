@@ -28,4 +28,4 @@ dependencies:
 #    - mkdir -p ~/docker; docker save navit/circleci > ~/docker/image.tar
 test:
   post:
-    - DISPLAY=:99 ~/navit/navit/bin/navit/navit
+    - cd ~/navit/navit/bin/navit/ && DISPLAY=:99 ./navit
