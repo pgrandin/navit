@@ -50,7 +50,7 @@
 #include "layout.h"
 #include "roadprofile.h"
 #include "util.h"
-
+#include "event.h"
 
 static DBusConnection *connection;
 static dbus_uint32_t dbus_serial;
