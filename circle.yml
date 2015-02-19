@@ -31,7 +31,7 @@ dependencies:
 test:
   override:
     - sed -i -e 's@libbinding_dbus.so" active="no"@libbinding_dbus.so" active="yes"@' navit.xml:
-      pwd: ~/navit/navit/bin/navit/
+        pwd: ~/navit/navit/bin/navit/
     - sleep 5
     - import -window root ~/assets/default.png
     - pkill navit
