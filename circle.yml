@@ -28,5 +28,5 @@ test:
         background: true
     - sleep 5
     - import -window root $CIRCLE_ARTIFACTS/default.png
-    - ./test_route.sh $CIRCLE_ARTIFACTS/routing.png
+    - ./test_route.sh $CIRCLE_ARTIFACTS
     - dbus-send  --print-reply --session --dest=org.navit_project.navit /org/navit_project/navit/default_navit org.navit_project.navit.navit.quit
