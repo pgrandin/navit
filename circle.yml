@@ -29,7 +29,6 @@ test:
     - sleep 5
     - import -window root $CIRCLE_ARTIFACTS/default.png
     - dbus-send  --print-reply --session --dest=org.navit_project.navit /org/navit_project/navit/default_navit org.navit_project.navit.navit.set_position string:"geo: -122.399168 37.620072"
-    - dbus-send  --print-reply --session --dest=org.navit_project.navit /org/navit_project/navit/default_navit org.navit_project.navit.navit.set_destination string:"geo: -122.289420 37.839374" string:"dbus"
     - sleep 1
     - dbus-send --session --type=method_call --print-reply --dest=org.navit_project.navit /org/navit_project/navit/default_navit org.navit_project.navit.navit.export_as_geojson string:$CIRCLE_ARTIFACTS/highfive_test.geojson
     - import -window root $CIRCLE_ARTIFACTS/routing.png
