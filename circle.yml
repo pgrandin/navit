@@ -19,7 +19,7 @@ dependencies:
     - "~/assets/"
 test:
   post:
-    - sed -i -e 's@type="internal" enabled@type="internal" fullscreen="1" font_size="350" enabled@' navit.xml
+    - sed -i -e 's@type="internal" enabled@type="internal" fullscreen="1" font_size="350" enabled@' navit.xml:
         pwd: navit/bin/navit/
     - sed -i -e 's@libbinding_dbus.so" active="no"@libbinding_dbus.so" active="yes"@' navit.xml:
         pwd: navit/bin/navit/
