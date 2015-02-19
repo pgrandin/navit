@@ -30,8 +30,7 @@ dependencies:
 #    - mkdir -p ~/docker; docker save navit/circleci > ~/docker/image.tar
 test:
   override:
-    - sed -i -e 's@libbinding_dbus.so" active="no"@libbinding_dbus.so" active="yes"@' navit.xml:
-        pwd: ~/navit/navit/bin/navit/
+    - cd ~/navit/navit/bin/navit/ && sed -i -e 's@libbinding_dbus.so" active="no"@libbinding_dbus.so" active="yes"@' navit.xml
     - sleep 5
     - import -window root ~/assets/default.png
     - pkill navit
