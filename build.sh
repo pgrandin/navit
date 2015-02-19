@@ -12,4 +12,4 @@ curl --form token=$COVERITY_TOKEN \
   --form file=@navit.tgz \
   --form version="$CIRCLE_SHA1" \
   --form description="$CIRCLE_SHA1" \
-  https://scan.coverity.com/builds?project=navit-gps
+  https://scan.coverity.com/builds?project=$COVERITY_PROJECT
