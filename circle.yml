@@ -29,7 +29,7 @@ dependencies:
 #    - docker build -t navit/circleci .
 #    - mkdir -p ~/docker; docker save navit/circleci > ~/docker/image.tar
 test:
-  override:
+  post:
     - cd ~/navit/navit/bin/navit/ && sed -i -e 's@libbinding_dbus.so" active="no"@libbinding_dbus.so" active="yes"@' navit.xml
     - sleep 5
     - import -window root ~/assets/default.png
