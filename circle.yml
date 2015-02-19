@@ -5,7 +5,7 @@ dependencies:
   pre:
     - wget -c -O ~/assets/cov-analysis-linux64-7.6.0.tar.gz http://sd-55475.dedibox.fr/cov-analysis-linux64-7.6.0.tar.gz
     - wget -c -O ~/assets/libspotify-12.1.51-Linux-x86_64-release.tar.gz https://developer.spotify.com/download/libspotify/libspotify-12.1.51-Linux-x86_64-release.tar.gz
-    - tar xvfz libspotify-12.1.51-Linux-x86_64-release.tar.gz
+    - tar xvfz ~/assets/libspotify-12.1.51-Linux-x86_64-release.tar.gz
     - cd libspotify-12.1.51-Linux-x86_64-release && sudo make prefix=/usr/local install
 #    - sudo apt-get install cmake zlib1g-dev libpng12-dev libgtk2.0-dev librsvg2-bin g++
 #    - sudo apt-get upgrade
