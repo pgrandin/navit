@@ -1255,6 +1255,26 @@ request_navit_set_layout(DBusConnection *connection, DBusMessage *message)
 	return empty_reply(connection, message);
 }
 
+
+static DBusHandlerResult
+request_navit_quit(DBusConnection *connection, DBusMessage *message)
+{
+	dbg(lvl_debug,"Got a quit request from DBUS\n");
+	struct attr navit;
+	navit.type=attr_navit;
+	struct navit *nav;
+	nav = object_get_from_message(message, "navit");
+	if (! nav)
+		return dbus_error_invalid_object_path(connection, message);
+	navit.u.navit=nav;
+	config_remove_attr(config, &navit);
+
+	struct callback *callback;
+	callback=callback_new_1(callback_cast(event_main_loop_quit), NULL);
+	event_add_timeout(1000, 1, callback);
+	return empty_reply(connection, message);
+}
+
 static DBusHandlerResult
 request_navit_zoom(DBusConnection *connection, DBusMessage *message)
 {
@@ -1887,6 +1907,7 @@ struct dbus_method {
 	{".navit",  "set_layout",          "s",       "layoutname",                              "",   "",      request_navit_set_layout},
 	{".navit",  "zoom",                "i(ii)",   "factor(pixel_x,pixel_y)",                 "",   "",      request_navit_zoom},
 	{".navit",  "zoom",                "i",       "factor",                                  "",   "",      request_navit_zoom},
+	{".navit",  "quit",                "",        "",                                        "",   "",      request_navit_quit},
 	{".navit",  "export_as_gpx",       "s",       "filename",                                "",   "",      request_navit_route_export_gpx},
 	{".navit",  "export_as_geojson",   "s",       "filename",                                "",   "",      request_navit_route_export_geojson},
 	{".navit",  "block",               "i",       "mode",                                    "",   "",      request_navit_block},
