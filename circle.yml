@@ -19,5 +19,11 @@ dependencies:
     - "~/assets/"
 test:
   post:
+    - sed -i -e 's@libbinding_dbus.so" active="no"@libbinding_dbus.so" active="yes"@' navit.xml:
+        pwd: navit/bin/navit/
     - ./navit:
         pwd: navit/bin/navit/
+        background: true
+    - sleep 5
+    - import -window root ~/assets/default.png
+    - dbus-send  --print-reply --session --dest=org.navit_project.navit /org/navit_project/navit/default_navit org.navit_project.navit.navit.quit
