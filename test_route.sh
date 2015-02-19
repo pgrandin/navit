@@ -3,7 +3,7 @@ lng="-122.399168"
 dlat="37.839374"
 dlng="-122.289420"
 
-echo '<map type="binfile" data="~/assets/california-latest.bin" />' > ~/navit/navit/navit/bin/navit/maps/planet.xml
+echo '<map type="binfile" data="~/assets/california-latest.bin" />' > /home/ubuntu/navit/navit/bin/navit/maps/planet.xml
 
 dbus-send  --print-reply --session --dest=org.navit_project.navit /org/navit_project/navit/default_navit org.navit_project.navit.navit.set_center_by_string string:"geo: $lng $lat"
 dbus-send  --print-reply --session --dest=org.navit_project.navit /org/navit_project/navit/default_navit org.navit_project.navit.navit.set_position string:"geo: $lng $lat"
