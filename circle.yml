@@ -31,8 +31,8 @@ dependencies:
 test:
   post:
     - cd ~/navit/navit/bin/navit/ && sed -i -e 's@libbinding_dbus.so" active="no"@libbinding_dbus.so" active="yes"@' navit.xml
-    - cd ~/navit/navit/bin/navit/ && ./navit:
-        background: true
+    - "cd ~/navit/navit/bin/navit/ && ./navit":
+      background: true
     - sleep 5
     - import -window root ~/assets/default.png
     - pkill navit
