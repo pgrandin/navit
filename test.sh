@@ -17,3 +17,4 @@ tmux select-layout tiled
 
 #tmux set-window-option synchronize-panes
 tmux -2 attach-session -t "navit-tests"
+exit 1
