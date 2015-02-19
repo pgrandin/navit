@@ -8,6 +8,8 @@
 #include <navit/color.h>
 #include <navit/event.h>
 
+#include <navit/spotify.h>
+
 #include "time.h"
 #include "gui_internal.h"
 #include "gui_internal_menu.h"
