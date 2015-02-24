@@ -35,3 +35,7 @@ test:
     - import -window root $CIRCLE_ARTIFACTS/default.png
     - bash test_route.sh $CIRCLE_ARTIFACTS
     - dbus-send  --print-reply --session --dest=org.navit_project.navit /org/navit_project/navit/default_navit org.navit_project.navit.navit.quit
+    - bundle install:
+        pwd: navit/navit/tools/map_hash/
+    - ruby hash.rb:
+        pwd: navit/navit/tools/map_hash/
