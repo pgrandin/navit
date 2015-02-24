@@ -6,7 +6,7 @@ require 'firebase'
 base_uri = 'https://navit.firebaseio.com/'
 firebase = Firebase::Client.new(base_uri)
 
-Zip::File.open('~/assets/california-latest.bin') do |zip_file|
+Zip::File.open('/home/ubuntu/assets/california-latest.bin') do |zip_file|
   # Handle entries one by one
   zip_file.each do |entry|
     puts "Hashing #{entry.name}"
