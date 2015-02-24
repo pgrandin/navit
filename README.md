@@ -1,6 +1,5 @@
 navit
 =====
 
-Drone.io : [![Build Status](https://drone.io/github.com/pgrandin/navit/status.png)](https://drone.io/github.com/pgrandin/navit/latest)
-
-Cloudbees : [![Build Status](https://navit.ci.cloudbees.com/buildStatus/icon?job=pgrandin)](https://navit.ci.cloudbees.com/job/pgrandin/)
+[![Circle CI](https://circleci.com/gh/pgrandin/navit.svg?style=svg)](https://circleci.com/gh/pgrandin/navit)
+[![Coverity](https://scan.coverity.com/projects/4193/badge.svg)](https://scan.coverity.com/projects/4193)
