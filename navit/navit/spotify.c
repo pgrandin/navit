@@ -614,7 +614,6 @@ media_set_current_track (int track_index)
  *
  */
 void
-void
 media_toggle_current_playlist_offline()
 {
     sp_playlist_set_offline_mode (g_sess, g_jukeboxlist,  sp_playlist_get_offline_status (g_sess, g_jukeboxlist) != 1);
