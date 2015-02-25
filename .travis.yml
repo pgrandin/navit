@@ -1,2 +1,6 @@
 language: c
-install: make
+before_script:
+  - cd navit
+  - mkdir bin
+  - cd bin
+  - cmake ..
