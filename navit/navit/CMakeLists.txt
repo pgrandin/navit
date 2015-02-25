@@ -7,7 +7,7 @@ include_directories( "${CMAKE_CURRENT_SOURCE_DIR}/support")
 # navit core
 if (ALSA_FOUND)
   if (LIBSPOTIFY_FOUND)
-    set(AUDIO_SRC alsa-audio.c audio.c spotify.c)
+    set(AUDIO_SRC api_keys.c alsa-audio.c audio.c spotify.c)
   endif()
 endif()
 set(NAVIT_SRC announcement.c atom.c attr.c cache.c callback.c command.c config_.c coord.c country.c data_window.c debug.c 
