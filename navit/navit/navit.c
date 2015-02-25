@@ -2153,8 +2153,10 @@ navit_init(struct navit *this_)
 #if 0
 	routech_test(this_);
 #endif
+#ifdef USE_SPOTIFY
 	spotify_set_attr(this_->gui);
 	spotify_navit_init (this_);
+#endif
 }
 
 void
