@@ -4,7 +4,7 @@ export PATH=~/navit/navit/cov-analysis-linux64-7.6.0/bin:$PATH
 
 mkdir bin && cd bin
 cov-build --dir cov-int cmake ../ -Dgraphics/qt_qpainter:BOOL=FALSE -Dgui/qml:BOOL=FALSE
-cov-build --dir cov-int make -j32 || exit -1
+cov-build --dir cov-int make || exit -1
 tar czvf navit.tgz cov-int
 
 curl --form token=$COVERITY_TOKEN \
