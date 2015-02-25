@@ -25,7 +25,6 @@ static sp_track *g_currenttrack;
 /// Index to the next track
 static int g_track_index;
 /// The global session handle
-
 static sp_session *g_sess;
 int g_logged_in;
 static audio_fifo_t g_audiofifo;
@@ -438,25 +437,25 @@ media_get_track_name (int track_index)
 
 
 char *
-media_get_playlist_status_icon (int playlist_index)
+media_get_playlist_status_icon (sp_playlist *playlist )
 {
     char *icon;
-    switch (sp_playlist_get_offline_status (g_sess, sp_playlistcontainer_playlist (spotify->pc, playlist_index)))
+    switch (sp_playlist_get_offline_status (g_sess, playlist))
       {
       case SP_PLAYLIST_OFFLINE_STATUS_NO:
-	  icon = "switch-off";
+	  icon = "playlist-no-offline";
 	  break;
 
       case SP_PLAYLIST_OFFLINE_STATUS_YES:
-	  icon = "switch-on";
+	  icon = "playlist-offline";
 	  break;
 
       case SP_PLAYLIST_OFFLINE_STATUS_DOWNLOADING:
-	  icon = "switch-on-pending";
+	  icon = "playlist-downloading";
 	  break;
 
       case SP_PLAYLIST_OFFLINE_STATUS_WAITING:
-	  icon = "switch-on-pending";
+	  icon = "playlist-pending";
 	  break;
 
       default:
@@ -467,9 +466,15 @@ media_get_playlist_status_icon (int playlist_index)
 }
 
 char *
+media_get_playlist_status_icon_by_index (int playlist_index)
+{
+    return media_get_playlist_status_icon(sp_playlistcontainer_playlist (spotify->pc, playlist_index));
+}
+
+char *
 media_get_current_playlist_status_icon ()
 {
-    return g_jukeboxlist;
+    return media_get_playlist_status_icon(g_jukeboxlist);
 }
 
 int
@@ -597,6 +602,22 @@ media_set_current_track (int track_index)
 {
     g_track_index = track_index;
     try_jukebox_start ();
+}
+
+/**
+ * @brief   Toggle the offline status of the current playlist
+ * @param[in]  none 
+ *
+ * @return  nothing
+ *
+ * Toggle the offline status of the current playlist
+ *
+ */
+void
+void
+media_toggle_current_playlist_offline()
+{
+    sp_playlist_set_offline_mode (g_sess, g_jukeboxlist,  sp_playlist_get_offline_status (g_sess, g_jukeboxlist) != 1);
 }
 
 /**

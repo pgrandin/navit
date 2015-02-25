@@ -88,8 +88,7 @@ spotify_play_playlist (struct gui_priv *this, struct widget *wm, void *data)
 void
 spotify_play_toggle_offline_mode (struct gui_priv *this, struct widget *wm, void *data)
 {
-    /* Fixme : we should get the playlist id from the widget */
-    // sp_playlist_set_offline_mode (g_sess, g_jukeboxlist,  sp_playlist_get_offline_status (g_sess, g_jukeboxlist) != 1);
+    media_toggle_current_playlist_offline();
     gui_internal_spotify_show_playlist (this, wm, data);
 }
 
@@ -132,12 +131,6 @@ gui_internal_spotify_track_toolbar (struct gui_priv *this, int track_index)
     wl->w = this->root.w;
     wl->cols = this->root.w / this->icon_s;
     wl->h = this->icon_s;
-    // FIXME : we need a radio icon
-    wb = gui_internal_button_new_with_callback (this, "",
-						image_new_s (this, "gui_active"),
-						gravity_left_center | orientation_horizontal, gui_internal_start_radio, NULL);
-    wb->c.x = track_index;
-    gui_internal_widget_append (wl, wb);
     gui_internal_widget_append (wl, wb =
 				gui_internal_button_new_with_callback (this,
 								       media_get_track_name (track_index),
@@ -175,8 +168,7 @@ gui_internal_spotify_playlist_toolbar (struct gui_priv *this)
     nrows = nitems / wl->cols + (nitems % wl->cols > 0);
     wl->h = this->icon_l * nrows;
     wb = gui_internal_button_new_with_callback (this, "Playlists",
-						image_new_s (this,
-							     "spotify_playlists"),
+						image_new_s (this, "playlist"),
 						gravity_left_center |
 						orientation_horizontal, gui_internal_spotify_show_rootlist, NULL);
     gui_internal_widget_append (wl, wb);
@@ -185,15 +177,15 @@ gui_internal_spotify_playlist_toolbar (struct gui_priv *this)
     gui_internal_widget_append (wl, wb =
 				gui_internal_button_new_with_callback (this,
 								       "Offline",
-								       image_new_s
-								       (this,
-									media_get_current_playlist_status_icon
-									()),
+								       image_new_s (this, media_get_current_playlist_status_icon ()),
 								       gravity_left_center
 								       |
 								       orientation_horizontal,
 								       spotify_play_toggle_offline_mode, NULL));
 
+    gui_internal_widget_append (wl, wb = gui_internal_button_new_with_callback (this, "Start Radio",
+						image_new_s (this, "radio"),
+						gravity_left_center | orientation_horizontal, gui_internal_start_radio, NULL));
     gui_internal_widget_pack (this, wl);
     return wl;
 }
@@ -233,7 +225,7 @@ gui_internal_spotify_show_rootlist (struct gui_priv *this, struct widget *wm, vo
 	  gui_internal_widget_append (tbl, row);
 	  wbm =
 	      gui_internal_button_new_with_callback (this,
-						     media_get_playlist_name(i),image_new_s (this, media_get_playlist_status_icon(i)),
+						     media_get_playlist_name(i),image_new_s (this, media_get_playlist_status_icon_by_index(i)),
 						     gravity_left_center |
 						     orientation_horizontal | flags_fill, spotify_play_playlist, NULL);
 
