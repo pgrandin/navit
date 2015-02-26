@@ -39,3 +39,9 @@ test:
 #        pwd: navit/navit/tools/map_hash/
 #    - ruby hash.rb:
 #        pwd: navit/navit/tools/map_hash/
+deployment:
+  deploy_staging:
+    branch: staging
+    commands:
+      - git push origin $CIRCLE_SHA1:refs/heads/master
+
