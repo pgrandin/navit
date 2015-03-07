@@ -121,6 +121,11 @@ static int min_turn_limit = 25;
  * Thresholds should be roughly halfway between them.
  * 25 degrees for min_turn_limit is probably OK (would be 22.5 by the above definition),
  * but maybe the rest should be somewhat closer to 67.5-117.5-157.5 instead of 45-105-165.
+ *
+ * robotaxi:
+ * suggested limits derived from 'simple turn rules' in bugfix/enhancement #1095:
+ * 25-45-110-165.
+ * taken over from here: 25 (straight limit) and 165 (u-turn-limit used for very strong turn) 
  */
 
 /** Minimum absolute delta for a turn of "normal" strength (which is always just announced as "turn left/right" even when strength is required).
@@ -129,7 +134,7 @@ static int turn_2_limit = 45;
 
 /** Minimum absolute delta for a sharp turn.
  * Maneuvers whose absolute delta is equal to or greater than this will be announced as "turn sharply left/right" when strength is required. */
-static int sharp_turn_limit = 105;
+static int sharp_turn_limit = 110;
 
 /** Minimum absolute delta for a U turn.
  * Maneuvers whose absolute delta is less than this (but at least {@code min_turn_limit}) will always be announced as turns.
@@ -500,7 +505,7 @@ get_bestranked(struct street_destination *street_destination)
 static int
 set_highrank(struct street_destination *street_destination, struct navigation_command *command)
 {
-	struct street_destination *future_street_destination;
+	struct street_destination *future_street_destination = NULL;
 	struct navigation_command *next_command;
 	char* destination_string;
 	int success = 0;
@@ -567,11 +572,11 @@ select_announced_destinations(struct navigation_command *current_command)
 		{	/* loop over every destination of the current command, as far as there are not more than MAX_DESTINATIONS entries. */
 			destination_index = 0; /* start with the first destination */
 			current_destination = current_command->itm->way.destination;
-			destination_count[destination_index]=0;
 			while (current_destination && (destination_index < MAX_DESTINATIONS))
 			{	/* initialize the search command */
 				search_command = current_command->next;
 				search_command_counter = 0;
+				destination_count[destination_index]=0;
 				while (search_command && (search_command_counter < MAX_LOOPS))
 				{
 					if (search_command->itm && search_command->itm->way.destination)
@@ -591,7 +596,6 @@ select_announced_destinations(struct navigation_command *current_command)
 					search_command = search_command->next;
 				}
 				destination_index++;
-				destination_count[destination_index]=0;
 				current_destination = current_destination->next;
 			}
 
@@ -1218,7 +1222,8 @@ navigation_way_get_angle_at(struct navigation_way *w, enum projection pro, doubl
  * @param w The way to examine
  * @param angle The reference bearing
  * @param dist The distance from the start of the way at which to determine bearing
- * @param dir Controls how to handle when the same delta is encountered multiple times but with different signs
+ * @param dir Controls how to handle when the same delta is encountered multiple times but with different signs,
+ * permissible values are either -1 or +1
  *
  * @return The delta, {@code -180 < delta <= 180}, or {@code invalid_angle} if an error occurred.
  */
@@ -1227,6 +1232,7 @@ navigation_way_get_max_delta(struct navigation_way *w, enum projection pro, int 
 	double dist_left = dist; /* distance from last examined point */
 	int ret = invalid_angle;
 	int tmp_delta;
+	int eff_dir = dir * w->dir; /* effective direction: +1 to examine section from start of way, -1 from end of way  */
 	struct coord cbuf[2];
 	struct item *realitem;
 	struct coord c;
@@ -1254,7 +1260,7 @@ navigation_way_get_max_delta(struct navigation_way *w, enum projection pro, int 
 		return ret;
 	}
 
-	if (w->dir < 0) {
+	if (eff_dir < 0) {
 		/* we're going against the direction of the item:
 		 * measure its total length and set dist_left to difference of total length and distance */
 		dist_left = 0;
@@ -1281,15 +1287,15 @@ navigation_way_get_max_delta(struct navigation_way *w, enum projection pro, int 
 	}
 
 	while (item_coord_get(realitem, &c, 1)) {
-		if ((w->dir > 0) && (dist_left <= 0))
+		if ((eff_dir > 0) && (dist_left <= 0))
 			break;
 		cbuf[0] = cbuf[1];
 		cbuf[1] = c;
 		dist_left -= transform_distance(pro, &cbuf[0], &cbuf[1]);
-		if ((w->dir < 0) && (dist_left > 0))
+		if ((eff_dir < 0) && (dist_left > 0))
 			continue;
 		tmp_delta = angle_delta(angle, road_angle(&cbuf[0], &cbuf[1], w->dir));
-		if ((ret == invalid_angle) || (abs(ret) < abs(tmp_delta)) || ((abs(ret) == abs(tmp_delta)) && ((dir * w->dir) < 0)))
+		if ((ret == invalid_angle) || (abs(ret) < abs(tmp_delta)) || ((abs(ret) == abs(tmp_delta)) && (eff_dir < 0)))
 			ret = tmp_delta;
 	}
 
@@ -1696,8 +1702,8 @@ navigation_itm_new(struct navigation *this_, struct item *routeitem)
 			}
 		}
 
-		item_attr_get(routeitem, attr_route, &route_attr);
-		graph_map = route_get_graph_map(route_attr.u.route);
+		if(item_attr_get(routeitem, attr_route, &route_attr))
+			graph_map = route_get_graph_map(route_attr.u.route);
 
 		dbg(lvl_debug,"i=%d start %d end %d '%s' \n", i, ret->way.angle2, ret->angle_end, ret->way.name_systematic);
 		map_rect_destroy(mr);
@@ -2295,11 +2301,336 @@ maneuver_required2 (struct navigation *nav, struct navigation_itm *old, struct n
 }
 
 /**
+ * @brief Adjusts a bearing delta to point in the same direction as a reference delta.
+ *
+ * Calculated delta results are constrained to -180 <= delta <= +180 degrees. Some heuristics, however, require values outside
+ * that range, e.g. -190 rather than 170 degrees. Given a reference with approximately correct orientation, this function corrects
+ * that delta to match the reference as closely as possible. This is done by adding or subtracting 360 degrees as needed.
+ *
+ * @param delta The delta to adjust. {@code abs(delta)} must be no greater than 180.
+ * @param reference The reference delta. {@code abs(reference)} must be no greater then 180.
+ * @return The adjusted delta, which is numerically within +/-180 degrees of the reference. If {@code delta} or {@code reference}
+ * are outside of their specified range, the result is undefined.
+ */
+int adjust_delta(int delta, int reference) {
+	if ((delta >= 0) && (delta - reference) > 180) {
+		dbg(lvl_debug,"adjusting delta from %d to %d\n", delta, delta - 360);
+		return delta - 360;
+	}
+	else if ((delta <= 0) && (reference - delta) > 180) {
+		dbg(lvl_debug,"adjusting delta from %d to %d\n", delta, delta + 360);
+		return delta + 360;
+	}
+	else
+		return delta;
+}
+
+/**
+ * @brief Analyzes a roundabout and sets maneuver information
+ *
+ * Exit from a roundabout requires a somewhat complex analysis of the ways involved in order to:
+ * <ul>
+ * <li>Calculate effective bearing change (between entry and exit) and store it in {@code cmd->roundabout_delta}</li>
+ * <li>Set {@code cmd->maneuver->type} to {@code nav_roundabout_{r|l}{1..8}}, based on bearing change</li>
+ * <li>Set {@code cmd->length}</li>
+ * </ul>
+ *
+ * Bearing change must be as close as possible to how drivers would perceive it.
+ * Builds prior to r2017 used the difference between the last way before and the first way after the roundabout,
+ * which tends to overestimate the angle when the ways leading towards and/or away from the roundabout split into
+ * separate carriageways in a Y-shape.
+ *
+ * In r2017 a different approach was introduced, which essentially distorts the roads so they enter and leave
+ * the roundabout at a 90 degree angle. (To make calculations simpler, tangents of the roundabout at the entry
+ * and exit points are used, with one of them reversed in direction, instead of the approach roads.)
+ * However, this approach tends to underestimate the angle when the distance between approach roads is large.
+ *
+ * Project HighFive introduced a new approach of combining both previous two approaches, calculating error estimates for each
+ * and using a weighted average between the two delta estimates so that the errors cancel each other out as far as possible.
+ *
+ * @param this_ The navigation object
+ * @param cmd A {@code struct navigation_cmd}, whose {@code delta} and {@code maneuver} members must be set prior to calling
+ * this function
+ * @param itm The navigation item for the maneuver to exit the roundabout
+ */
+void navigation_analyze_roundabout(struct navigation *this_, struct navigation_command *cmd, struct navigation_itm *itm) {
+	enum item_type r = type_none, l = type_none;
+	int len = 0; /* length of roundabout segment */
+	int roundabout_length; /* estimated total length of roundabout */
+	int angle = 0;
+	int entry_tangent; /* tangent of the roundabout at entry point, against direction of route */
+	int exit_tangent; /* tangent of the roundabout at exit point, in direction of route */
+	int entry_road_angle, exit_road_angle; /* angles before and after approach segments */
+	struct navigation_itm *itm2; /* items before itm to examine, up to first roundabout segment on route */
+	struct navigation_itm *itm3; /* items before itm2 and after itm to examine */
+	struct navigation_way *w;    /* continuation of the roundabout after we leave it, or the way in which to turn. */
+	struct navigation_way *w2;   /* segment of the roundabout leading to the point at which we enter it */
+	int dtsir = 0;     /* delta to stay in roundabout */
+	int d, dmax = 0;   /* when examining deltas of roundabout approaches, current and maximum encountered */
+	int delta1, delta2, error1 = 0, error2; /* for roundabout delta calculated with different approaches, and error margin */
+	int delta3; /* roundabout delta calculated from entry_road_angle and exit_road_angle, currently not used in calculations */
+	int dist_left; /* when examining ways around the roundabout to a certain threshold, the distance we have left to go */
+	int central_angle; /* approximate central angle for the roundabout arc that is part of the route */
+	int more_ways_for_strength = 0; /* Counts the number of ways of the current node that turn
+					   to the same direction as the route way. Strengthening criterion. */
+	int turn_no_of_route_way = 0;   /* The number of the route way of all ways that turn to the same direction.
+					   Count direction from abs(0 degree) up to abs(180 degree). Strengthening criterion. */
+
+	/* Find continuation of roundabout after the exit. Don't simply use itm->way.next here, it will break
+	 * if a node in the roundabout is shared by more than one way */
+	w = itm->way.next;
+	while (w && !(w->flags & AF_ROUNDABOUT))
+		w = w->next;
+	if (w) {
+		/* When exiting a roundabout, w should never be null, thus this
+		 * code will always be executed. Checking for the condition anyway ensures
+		 * that botched map data (roundabout ending with nowhere else to go) will not
+		 * cause a crash. For the same reason we're using dtsir with a default value of 0.
+		 */
+
+		/* approximate error for delta2: central angle (=bearing change) of roundabout segment after exit */
+		error2 = abs(angle_delta(itm->prev->angle_end, navigation_way_get_exit_angle(w)));
+
+		dtsir = angle_delta(itm->prev->angle_end, w->angle2);
+		dbg(lvl_debug,"delta to stay in roundabout %d\n", dtsir);
+
+		exit_tangent = angle_median(itm->prev->angle_end, w->angle2);
+		dbg(lvl_debug,"exit %d median from %d, %d\n", exit_tangent, itm->prev->angle_end, w->angle2);
+
+		/* Move back to where we enter the roundabout, calculate length in roundabout */
+		itm2=itm;
+		while (itm2->prev && (itm2->prev->way.flags & AF_ROUNDABOUT)) {
+			itm2=itm2->prev;
+			len+=itm2->length;
+			angle=itm2->angle_end;
+		}
+
+		/* Find the segment of the roundabout leading up to the point at which we enter it. Again, don't simply
+		 * use itm2->way.next here, it will break if a node in the roundabout is shared by more than one way */
+		w2 = itm2->way.next;
+		while (w2 && !(w2->flags & AF_ROUNDABOUT))
+			w2 = w2->next;
+
+		/* Calculate entry angle */
+		if (itm2 && w2) {
+			/* improve error estimate for delta2: average of central angles (=bearing change) of the roundabout
+			 * segments before entry and after exit */
+			error2 = (error2 + abs(angle_delta(angle_opposite(itm2->way.angle2), navigation_way_get_exit_angle(w2)))) / 2;
+			entry_tangent = angle_median(angle_opposite(itm2->way.angle2), w2->angle2);
+			dbg(lvl_debug, "entry %d median from %d (%d), %d\n", entry_tangent, angle_opposite(itm2->way.angle2), itm2->way.angle2, itm2->way.next->angle2);
+		} else {
+			entry_tangent = angle_opposite(angle);
+		} /* endif itm2 && w2 */
+		dbg(lvl_debug, "entry %d exit %d\n", entry_tangent, exit_tangent);
+
+		delta2 = angle_delta(entry_tangent, exit_tangent);
+		dbg(lvl_debug, "delta2 %d error %d\n", delta2, error2);
+
+		if (itm2->prev) {
+			/* If there are V-shaped approach segments and we are turning around or making a sharp turn,
+			 * delta1 may point in the wrong direction, thus we need adjust_delta() to correct this. */
+			delta1 = adjust_delta(angle_delta(itm2->prev->angle_end, itm->way.angle2), delta2);
+
+			/* Now try to figure out the error range for delta1. Errors are caused by turns in the approach segments
+			 * just before the roundabout. We use the last segment before the approach as a reference.
+			 * We assume the approach to begin when one of the following is true:
+			 * - a way turns into a ramp
+			 * - a way turns into a one-way road
+			 * - a certain distance from the roundabout, proportional to its circumference, is exceeded
+			 * Simply comparing bearings at these points may cause confusion with certain road layouts (namely
+			 * S-shaped dual-carriageway roads), hence we examine the entire approach segment and take the largest
+			 * delta (relative to the end of the approach segment) which we encounter.
+			 * This is done for both ends of the roundabout.
+			 */
+
+			/* Approximate roundabout circumference based on len and approximate central angle of route segment.
+			 * The central angle is approximated using the unweighted average of delta1 and delta2,
+			 * which is somewhat crude but should be OK for error estimates. */
+			central_angle = abs((delta1 + delta2) / 2 + ((cmd->delta < dtsir) ? 180 : -180));
+			roundabout_length = len * 360 / central_angle;
+			dbg(lvl_debug,"roundabout_length = %dm (for central_angle = %d degrees)\n", roundabout_length, central_angle);
+
+			/* in the case of separate carriageways, approach roads become hard to identify, thus we keep a cap on distance.
+			 * Currently this is at most half the length of the roundabout. */
+			/* FIXME: experiment with different values here */
+			dist_left = roundabout_length / 2;
+			dbg(lvl_debug,"examining roads for up to %dm to estimate error for delta1\n", dist_left);
+
+			/* examine items before roundabout */
+			itm3 = itm2->prev; /* last segment before roundabout */
+			while (itm3->prev) {
+				if ((itm3->next && is_ramp(&(itm3->next->way)) && !is_ramp(&(itm3->way))) || !(itm3->way.flags & AF_ONEWAYMASK)) {
+					dbg(lvl_debug,"items before roundabout: break because ramp or oneway ends, %dm left\n", dist_left);
+					dist_left = 0; /* to make sure we don't examine the following way in depth */
+					break;
+				}
+				if (dist_left <= itm3->length) {
+					dbg(lvl_debug,"items before roundabout: maximum distance reached, %dm left, item length %dm\n", dist_left, itm3->length);
+					break;
+				}
+				d = navigation_way_get_max_delta(&(itm3->way), map_projection(this_->map), itm2->prev->angle_end, dist_left, -1);
+				if ((d != invalid_angle) && (abs(d) > abs(dmax)))
+					dmax = d;
+				if (itm3->way.next) {
+					dbg(lvl_debug,"items before roundabout: break because of potential maneuver, %dm left\n", dist_left);
+					dist_left = itm3->length;
+					break;
+				}
+				dist_left -= itm3->length;
+				itm3 = itm3->prev;
+			}
+			if (dist_left == 0) {
+				d = angle_delta(itm3->angle_end, itm2->prev->angle_end);
+			} else if (dist_left < itm3->length) {
+				d = navigation_way_get_max_delta(&(itm3->way), map_projection(this_->map), itm2->prev->angle_end, dist_left, -1);
+			} else {
+				/* not enough objects in navigation map, use most distant one
+				 * - or dist_left == itm3->length, this saves a few CPU cycles over the above */
+				d = angle_delta(itm3->way.angle2, itm2->prev->angle_end);
+			}
+			if ((d != invalid_angle) && (abs(d) > abs(dmax)))
+				dmax = d;
+			error1 = abs(dmax);
+			entry_road_angle = itm2->prev->angle_end + dmax;
+			dbg(lvl_debug,"entry_road_angle %d (%d + %d)\n", entry_road_angle, itm2->prev->angle_end, dmax);
+
+			/* examine items after roundabout */
+			dmax = 0;
+			dist_left = roundabout_length / 2;
+			itm3 = itm; /* first segment after roundabout */
+			while (itm3->next) {
+				if ((itm3->prev && is_ramp(&(itm3->prev->way)) && !is_ramp(&(itm3->way))) || !(itm3->way.flags & AF_ONEWAYMASK)) {
+					dbg(lvl_debug,"items after roundabout: break because ramp or oneway ends, %dm left\n", dist_left);
+					dist_left = 0; /* to make sure we don't examine the following way in depth */
+					break;
+				}
+				if (dist_left <= itm3->length) {
+					dbg(lvl_debug,"items after roundabout: maximum distance reached, %dm left, item length %dm\n", dist_left, itm3->length);
+					break;
+				}
+				d = navigation_way_get_max_delta(&(itm3->way), map_projection(this_->map), itm->way.angle2, dist_left, 1);
+				if ((d != invalid_angle) && (abs(d) > abs(dmax)))
+					dmax = d;
+				if (itm3->next->way.next) {
+					dbg(lvl_debug,"items after roundabout: break because of potential maneuver, %dm left\n", dist_left);
+					dist_left = itm3->length;
+					break;
+				}
+				dist_left -= itm3->length;
+				itm3 = itm3->next;
+			}
+			if (dist_left == 0) {
+				d = angle_delta(itm->way.angle2, itm3->way.angle2);
+			} else if (dist_left < itm3->length) {
+				d = navigation_way_get_max_delta(&(itm3->way), map_projection(this_->map), itm->way.angle2, dist_left, 1);
+			} else {
+				/* not enough objects in navigation map, use most distant one
+				 * - or dist_left == itm3->length, this saves a few CPU cycles over the above */
+				d = angle_delta(itm->way.angle2, itm3->angle_end);
+			}
+			if ((d != invalid_angle) && (abs(d) > abs(dmax)))
+				dmax = d;
+
+			/* If delta1 is outside +/-180, this is another input factor for error1.
+			 * Using max() ensures that (if delta1 is within +/-180, the second argument
+			 * is negative and the first one takes precedence). */
+			error1 = max((error1 + abs(dmax) + 1) / 2, 2 * (abs(delta1) - 180));
+
+			exit_road_angle = itm->way.angle2 + dmax;
+			dbg(lvl_debug,"exit_road_angle %d (%d + %d)\n", exit_road_angle, itm->way.angle2, dmax);
+
+			dbg(lvl_debug,"delta1 %d error %d\n", delta1, error1);
+
+			/* We now have two approximations delta1 and delta2 with corresponding errors.
+			 * However, deltas are biased as each constitutes a boundary of its possible range.
+			 * We need to correct this so that each delta will be in the middle of its range.
+			 * This requires knowing the direction of the roundabout.
+			 * To avoid mis-guessing, we use two approaches and use results only if both agree.
+			 * Note that we divide the error range by two even if we can't guess the direction.
+			 * While not 100% correct, it has no impact on results as long as the ratio is maintained.
+			 * Adding 1 before dividing ensures we round up. */
+			error1 = (error1 + 1) / 2;
+			error2 = (error2 + 1) / 2;
+			if ((cmd->delta > dtsir) && (delta1 < delta2)) {
+				/* counterclockwise; exit right; delta1 (approach ways) further left (i.e. smaller) than delta2 (tangents) */
+				delta1 += error1;
+				delta2 -= error2;
+				dbg(lvl_debug,"Corrected delta1 %d error %d, delta2 %d error %d\n", delta1, error1, delta2, error2);
+			} else if ((cmd->delta < dtsir) && (delta1 > delta2)) {
+				/* clockwise; exit left; delta1 (approach ways) further right (greater) than delta2 (tangents) */
+				delta1 -= error1;
+				delta2 += error2;
+				dbg(lvl_debug,"Corrected delta1 %d error %d, delta2 %d error %d\n", delta1, error1, delta2, error2);
+			}
+
+			delta3 = adjust_delta(angle_delta(entry_road_angle, exit_road_angle), delta2);
+			dbg(lvl_debug,"delta3 %d\n", delta3);
+
+			if ((error1 == 0) && (error2 == 0))
+				cmd->roundabout_delta = (delta1 + delta2) / 2;
+			else
+				cmd->roundabout_delta = (delta1 * error2 + delta2 * error1) / (error1 + error2);
+			cmd->roundabout_delta = (cmd->roundabout_delta + delta3) / 2;
+			dbg(lvl_debug,"roundabout_delta %d\n", cmd->roundabout_delta);
+		} else {
+			/* we don't know where we entered the roundabout, so we can't calculate delta1 */
+			cmd->roundabout_delta = delta2;
+		} /* endif itm2->prev */
+		cmd->length=len+roundabout_extra_length;
+	} /* if w */
+
+	/* set cmd->maneuver->type */
+	switch (((180 + 22) - cmd->roundabout_delta) / 45) {
+	case 0:
+	case 1:
+		r = type_nav_roundabout_r1;
+		l = type_nav_roundabout_l7;
+		break;
+	case 2:
+		r = type_nav_roundabout_r2;
+		l = type_nav_roundabout_l6;
+		break;
+	case 3:
+		r = type_nav_roundabout_r3;
+		l = type_nav_roundabout_l5;
+		break;
+	case 4:
+		r = type_nav_roundabout_r4;
+		l = type_nav_roundabout_l4;
+		break;
+	case 5:
+		r = type_nav_roundabout_r5;
+		l = type_nav_roundabout_l3;
+		break;
+	case 6:
+		r = type_nav_roundabout_r6;
+		l = type_nav_roundabout_l2;
+		break;
+	case 7:
+		r = type_nav_roundabout_r7;
+		l = type_nav_roundabout_l1;
+		break;
+	case 8:
+		r = type_nav_roundabout_r8;
+		l = type_nav_roundabout_l8;
+		break;
+	}
+	dbg(lvl_debug,"delta %d\n", cmd->delta);
+	/* if delta to leave the roundabout (cmd->delta) is less than delta to stay in roundabout (dtsir),
+	 * we're exiting to the left, so we're probably in a clockwise roundabout, and vice versa */
+	if (cmd->delta < dtsir)
+		cmd->maneuver->type = l;
+	else
+		cmd->maneuver->type = r;
+	dbg(lvl_debug,"type %s\n", item_to_name(cmd->maneuver->type));
+}
+
+
+/**
  * @brief Creates a new {@code struct navigation_command} for a maneuver.
  *
  * This function also parses {@code maneuver} and sets its {@code type} appropriately so that other
- * functions can rely on that. This is currently underway and only a few maneuver types are implemented
- * thus far.
+ * functions can rely on that.
  *
  * @param this_ The navigation object
  * @param itm The navigation item following the maneuver
@@ -2311,23 +2642,11 @@ static struct navigation_command *
 command_new(struct navigation *this_, struct navigation_itm *itm, struct navigation_maneuver *maneuver)
 {
 	struct navigation_command *ret=g_new0(struct navigation_command, 1);
-	enum item_type r = type_none, l = type_none;
-
-	/* Some variables needed only for roundabouts */
-	int len=0; /* length of roundabout segment */
-	int roundabout_length; /* estimated total length of roundabout */
-	int angle=0;
-	int entry_angle; /* angle at which we enter the roundabout, offset by 90 degrees */
-	int exit_angle; /* angle at which we leave the roundabout, offset by 90 degrees */
-	struct navigation_itm *itm2; /* items before itm to examine, up to first roundabout segment on route */
-	struct navigation_itm *itm3; /* items before itm2 and after itm to examine */
-	struct navigation_way *w; /* continuation of the roundabout after we leave it */
-	struct navigation_way *w2; /* segment of the roundabout leading to the point at which we enter it */
-	int dtsir = 0; /* delta to stay in roundabout */
-	int d, dmax = 0; /* when examining deltas of roundabout approaches, current and maximum encountered */
-	int delta1, delta2, error1 = 0, error2; /* for roundabout delta calculated with different approaches, and error margin */
-	int dist_left; /* when examining ways around the roundabout to a certain threshold, the distance we have left to go */
-	int central_angle; /* approximate central angle for the roundabout arc that is part of the route */
+	struct navigation_way *w;    /* the way in which to turn. */
+	int more_ways_for_strength = 0; /* Counts the number of ways of the current node that turn
+							   	   	   to the same direction as the route way. Strengthening criterion. */
+	int turn_no_of_route_way = 0;   /* The number of the route way of all ways that turn to the same direction.
+							   	   	   Count direction from abs(0 degree) up to abs(180 degree). Strengthening criterion. */
 
 	dbg(lvl_debug,"enter this_=%p itm=%p maneuver=%p delta=%d\n", this_, itm, maneuver, maneuver->delta);
 	ret->maneuver = maneuver;
@@ -2349,290 +2668,127 @@ command_new(struct navigation *this_, struct navigation_itm *itm, struct navigat
 	 */
 
 	if (ret->maneuver->type != type_nav_destination) {
-		// TODO: make this a separate function (improves code legibility)
-		/* if we're leaving a roundabout, special handling is needed:
-		 * - calculate effective bearing change (between entry and exit),
-		 * - set length,
-		 * - set ret->maneuver->type to nav_roundabout_{r|l}{1..8}.
-		 *
-		 * Bearing change must be as close as possible to how drivers would perceive it.
-		 * Builds prior to r2017 used the difference between the last way before and the first way after the roundabout,
-		 * which tends to overestimate the angle when V-shaped approach roads are involved.
-		 *
-		 * In r2017 a different approach was introduced, which essentially distorts the roads so they enter and leave
-		 * the roundabout at a 90 degree angle. (To make calculations simpler, tangents of the roundabout at the entry
-		 * and exit points are used, with one of them reversed in direction, instead of the approach roads.)
-		 * However, this approach tends to underestimate the angle when the distance between approach roads is large.
-		 *
-		 * Project HighFive combines these two approaches, using a weighted average between the two so that the errors
-		 * cancel each other out as far as possible.
-		 */
 		/* FIXME: this will not catch cases in which entry and exit share the same node and we just *touch* the roundabout */
 		if (itm && itm->prev && !(itm->way.flags & AF_ROUNDABOUT) && (itm->prev->way.flags & AF_ROUNDABOUT)) {
-			/* Find continuation of roundabout after the exit. Don't simply use itm->way.next here, it will break
-			 * if a node in the roundabout is shared by more than one way */
-			w = itm->way.next;
-			while (w && !(w->flags & AF_ROUNDABOUT))
-				w = w->next;
-			if (w) {
-				/* When exiting a roundabout, w should never be null, thus this
-				 * code will always be executed. Checking for the condition anyway ensures
-				 * that botched map data (roundabout ending with nowhere else to go) will not
-				 * cause a crash. For the same reason we're using dtsir with a default value of 0.
-				 */
+			navigation_analyze_roundabout(this_, ret, itm);
+		} else {
+			/* non-roundabout turn --> */
 
-				/* approximate error for delta2: central angle (=bearing change) of roundabout segment after exit */
-				error2 = abs(angle_delta(itm->prev->angle_end, navigation_way_get_exit_angle(w)));
+			/* set ret->maneuver->type */
+			if (abs(ret->delta) >= min_turn_limit) {
 
-				dtsir = angle_delta(itm->prev->angle_end, w->angle2);
-				dbg(lvl_debug,"delta to stay in roundabout %d\n", dtsir);
+				/* Strengthening criterion: If there are more ways in the same direction, in which the vehicle can turn,
+				   the announcement shall be more precise. I.e. the strengthening is dependent on which of the possible ways
+				   the route turn shall be. So, with the selection of one of the possible ways a certain turn angle pattern
+				   becomes active.
+				   Second criterion: the turn angle of the route way defines the strengthening of the announcement according
+				   to the pattern. */
+				w = itm->next->way.next;
 
-				exit_angle=angle_median(itm->prev->angle_end, w->angle2);
-				dbg(lvl_debug,"exit %d median from %d,%d\n", exit_angle,itm->prev->angle_end, w->angle2);
-
-				/* Move back to where we enter the roundabout, calculate length in roundabout */
-				itm2=itm;
-				while (itm2->prev && (itm2->prev->way.flags & AF_ROUNDABOUT)) {
-					itm2=itm2->prev;
-					len+=itm2->length;
-					angle=itm2->angle_end;
+				if (angle_delta(itm->next->way.angle2,itm->angle_end) < 0) { /* next turns or bends left */
+					while (w) {
+						if (angle_delta(w->angle2,itm->angle_end) < -min_turn_limit) {
+							more_ways_for_strength++;	/* there is an additional way that also turns left.
+											   Note: the route turn is not contained
+											   Left means more than min_turn_limit, less is straight on */
+							if (angle_delta(w->angle2,itm->angle_end) < ret->delta)
+								turn_no_of_route_way++; /* this way is on the left side of the route way */
+						}
+						w = w->next;
+					}
+				} else {  /* next turns or bends right. Same investigation, but mirrored. */
+					while (w) {
+						if (angle_delta(w->angle2,itm->angle_end) > min_turn_limit) {
+							more_ways_for_strength++;
+							if (angle_delta(w->angle2,itm->angle_end) > ret->delta)
+								turn_no_of_route_way++; /* this way is on the right side of the route way */
+						}
+						w = w->next;
+					}
 				}
 
-				/* Find the segment of the roundabout leading up to the point at which we enter it. Again, don't simply
-				 * use itm2->way.next here, it will break if a node in the roundabout is shared by more than one way */
-				w2 = itm2->way.next;
-				while (w2 && !(w2->flags & AF_ROUNDABOUT))
-					w2 = w2->next;
 
-				/* Calculate entry angle */
-				if (itm2 && w2) {
-					/* improve error estimate for delta2: average of central angles (=bearing change) of the roundabout
-					 * segments before entry and after exit */
-					error2 = (error2 + abs(angle_delta(angle_opposite(itm2->way.angle2), navigation_way_get_exit_angle(w2)))) / 2;
-					entry_angle=angle_median(angle_opposite(itm2->way.angle2), w2->angle2);
-					dbg(lvl_debug,"entry %d median from %d(%d),%d\n", entry_angle,angle_opposite(itm2->way.angle2), itm2->way.angle2, itm2->way.next->angle2);
-				} else {
-					entry_angle=angle_opposite(angle);
-				} /* endif itm2 && w2 */
-				dbg(lvl_debug,"entry %d exit %d\n", entry_angle, exit_angle);
-
-				delta2 = angle_delta(entry_angle, exit_angle);
-				dbg(lvl_debug,"delta2 %d error %d\n", delta2, error2);
-
-				if (itm2->prev) {
-					delta1 = angle_delta(itm2->prev->angle_end, itm->way.angle2);
-					/* If we are turning around and there are V-shaped approach segments, delta1 will point
-					 * in the wrong direction. This may also happen with sharp turns, taking the last exit.
-					 * Hence we need to add or subtract 360 degrees in these cases.
-					 * This is the case when both delta1 and delta2 are somewhat close to +/-180
-					 * but in opposite directions. We're using 0 degrees as the threshold, which should be OK because
-					 * delta2 tends to underestimate the central angle. (+/-90 fails to catch some cases.)*/
-					if ((ret->delta > dtsir) && (delta2 < 0) && (delta1 > 90)) {
-						/* counterclockwise roundabout */
-						dbg(lvl_debug,"correcting delta1 %d to %d\n", delta1, delta1 - 360);
-						delta1 -= 360;
-					} if ((ret->delta < dtsir) && (delta2 > 0) && (delta1 < -90)) {
-						/* clockwise roundabout */
-						dbg(lvl_debug,"correcting delta1 %d to %d\n", delta1, delta1 + 360);
-						delta1 += 360;
-					}
-
-					/* Now try to figure out the error range for delta1. Errors are caused by turns in the approach segments
-					 * just before the roundabout. We use the last segment before the approach as a reference.
-					 * We assume the approach to begin when one of the following is true:
-					 * - a way turns into a ramp
-					 * - a way turns into a one-way road
-					 * - a certain distance from the roundabout, proportional to its circumference, is exceeded
-					 * Simply comparing bearings at these points may cause confusion with certain road layouts (namely
-					 * S-shaped dual-carriageway roads), hence we examine the entire approach segment and take the largest
-					 * delta (relative to the end of the approach segment) which we encounter.
-					 * This is done for both ends of the roundabout.
-					 */
-
-					/* Approximate roundabout circumference based on len and approximate central angle of route segment.
-					 * The central angle is approximated using the unweighted average of delta1 and delta2,
-					 * which is somewhat crude but should be OK for error estimates. */
-					central_angle = abs((delta1 + delta2) / 2 + ((ret->delta < dtsir) ? 180 : -180));
-					roundabout_length = len * 360 / central_angle;
-					dbg(lvl_debug,"roundabout_length = %dm (for central_angle = %d degrees)\n", roundabout_length, central_angle);
-
-					/* in the case of separate carriageways, approach roads become hard to identify, thus we keep a cap on distance.
-					 * Currently this is at most half the length of the roundabout. */
-					/* FIXME: experiment with different values here */
-					dist_left = roundabout_length / 2;
-					dbg(lvl_debug,"examining roads for up to %dm to estimate error for delta1\n", dist_left);
-
-					/* examine items before roundabout */
-					itm3 = itm2->prev;
-					while (itm3->prev && (dist_left >= itm3->length)) {
-						if ((itm3->next && is_ramp(&(itm3->next->way)) && !is_ramp(&(itm3->way))) || !(itm3->way.flags & AF_ONEWAYMASK)) {
-							dist_left = 0; /* to make sure we don't examine the following way in depth */
-							break;
-						}
-						d = navigation_way_get_max_delta(&(itm3->way), map_projection(this_->map), itm2->angle_end, itm3->length - dist_left, -1);
-						if ((d != invalid_angle) && (abs(d) > abs(dmax)))
-							dmax = d;
-						dist_left -= itm3->length;
-						itm3 = itm3->prev;
-						if (itm3->next && itm3->next->way.next) {
-							dist_left = 0;
-							break;
-						}
-					}
-					if (dist_left == 0) {
-						d = angle_delta(itm3->angle_end, itm2->angle_end);
-					} else if (dist_left <= itm3->length) {
-						d = navigation_way_get_max_delta(&(itm3->way), map_projection(this_->map), itm2->angle_end, itm3->length - dist_left, -1);
+				// Investigate the strengthening of announcement.
+				switch (more_ways_for_strength) {
+				case 0:
+					// Only one possibility to turn to this direction
+					if (ret->delta < -sharp_turn_limit) {
+						ret->maneuver->type = type_nav_left_3; /* strongly left */
+					} else if (ret->delta <= 0) {
+						ret->maneuver->type = type_nav_left_2; /* normally left */
+					} else if (ret->delta <= sharp_turn_limit) {
+						ret->maneuver->type = type_nav_right_2;/* normally right */
 					} else {
-						/* not enough objects in navigation map, use most distant one */
-						d = angle_delta(itm3->way.angle2, itm2->angle_end);
+						ret->maneuver->type = type_nav_right_3;/* strongly right */
 					}
-					if ((d != invalid_angle) && (abs(d) > abs(dmax)))
-						dmax = d;
-					error1 = abs(dmax);
-					//TODO delta3
-
-					/* examine items after roundabout */
-					dmax = 0;
-					dist_left = roundabout_length / 2;
-					itm3 = itm;
-					while (itm3->next && (dist_left >= itm3->length)) {
-						if ((itm3->prev && is_ramp(&(itm3->prev->way)) && !is_ramp(&(itm3->way))) || !(itm3->way.flags & AF_ONEWAYMASK)) {
-							dist_left = 0; /* to make sure we don't examine the following way in depth */
-							break;
+					break;
+				case 1:
+					/* One additional possibility to turn to the same direction */
+					if (turn_no_of_route_way == 0) {
+						// the route is less strong to turn
+						if (ret->delta < -turn_2_limit) {
+							ret->maneuver->type = type_nav_left_2;  /* normally left */
+						} else if (ret->delta <= 0) {
+							ret->maneuver->type = type_nav_left_1;  /* easily left */
+						} else if (ret->delta <= turn_2_limit) {
+							ret->maneuver->type = type_nav_right_1; /* easily right */
+						} else {
+							ret->maneuver->type = type_nav_right_2; /* normally right */
 						}
-						d = navigation_way_get_max_delta(&(itm3->way), map_projection(this_->map), itm->way.angle2, dist_left, 1);
-						if ((d != invalid_angle) && (abs(d) > abs(dmax)))
-							dmax = d;
-						dist_left -= itm3->length;
-						itm3 = itm3->next;
-						if (itm3->way.next) {
-							dist_left = 0;
-							break;
-						}
-					}
-					if (dist_left == 0) {
-						d = angle_delta(itm->way.angle2, itm3->way.angle2);
-					} else if (dist_left <= itm3->length) {
-						d = navigation_way_get_max_delta(&(itm3->way), map_projection(this_->map), itm->way.angle2, dist_left, 1);
 					} else {
-						/* not enough objects in navigation map, use most distant one */
-						d = angle_delta(itm->way.angle2, itm3->angle_end);
+						if (ret->delta < -sharp_turn_limit) {
+							ret->maneuver->type = type_nav_left_3;  /* strongly left */
+						} else if (ret->delta <= 0) {
+							ret->maneuver->type = type_nav_left_2;  /* normally left */
+						} else if (ret->delta <= sharp_turn_limit) {
+							ret->maneuver->type = type_nav_right_2; /* normally right */
+						} else {
+							ret->maneuver->type = type_nav_right_3; /* strongly right */
+						}
 					}
-					if ((d != invalid_angle) && (abs(d) > abs(dmax)))
-						dmax = d;
-					error1 = (error1 + abs(dmax) + 1) / 2;
-					// TODO delta3
-
-					dbg(lvl_debug,"delta1 %d error %d\n", delta1, error1);
-
-					/* We now have two approximations delta1 and delta2 with corresponding errors.
-					 * However, deltas are biased as each constitutes a boundary of its possible range.
-					 * We need to correct this so that each delta will be in the middle of its range.
-					 * This requires knowing the direction of the roundabout.
-					 * To avoid mis-guessing, we use two approaches and use results only if both agree.
-					 * Note that we divide the error range by two even if we can't guess the direction.
-					 * While not 100% correct, it has no impact on results as long as the ratio is maintained.
-					 * Adding 1 before dividing ensures we round up. */
-					error1 = (error1 + 1) / 2;
-					error2 = (error2 + 1) / 2;
-					if ((ret->delta > dtsir) && (delta1 < delta2)) {
-						/* counterclockwise; exit right; delta1 (approach ways) further left (i.e. smaller) than delta2 (tangents) */
-						delta1 += error1;
-						delta2 -= error2;
-						dbg(lvl_debug,"Corrected delta1 %d error %d, delta2 %d error %d\n", delta1, error1, delta2, error2);
-					} else if ((ret->delta < dtsir) && (delta1 > delta2)) {
-						/* clockwise; exit left; delta1 (approach ways) further right (greater) than delta2 (tangents) */
-						delta1 -= error1;
-						delta2 += error2;
-						dbg(lvl_debug,"Corrected delta1 %d error %d, delta2 %d error %d\n", delta1, error1, delta2, error2);
+					break;
+				default:
+					/* Two or more additional possibilities to turn to the same direction. */
+					if (turn_no_of_route_way == 0) {
+						if (ret->delta < -turn_2_limit) {
+							ret->maneuver->type = type_nav_left_2;  /* normally left */
+						} else if (ret->delta <= 0) {
+							ret->maneuver->type = type_nav_left_1;  /* easily left */
+						} else if (ret->delta <= turn_2_limit) {
+							ret->maneuver->type = type_nav_right_1; /* easily right */
+						} else {
+							ret->maneuver->type = type_nav_right_2; /* normally right */
+						}
 					}
-
-					if ((error1 == 0) && (error2 == 0))
-						ret->roundabout_delta = (delta1 + delta2) / 2;
-					else
-						ret->roundabout_delta = (delta1 * error2 + delta2 * error1) / (error1 + error2);
-					dbg(lvl_debug,"roundabout_delta %d\n", ret->roundabout_delta);
-				} else {
-					/* we don't know where we entered the roundabout, so we can't calculate delta1 */
-					ret->roundabout_delta = delta2;
-				} /* endif itm2->prev */
-				ret->length=len+roundabout_extra_length;
-			} /* if w */
-
-			/* set ret->maneuver->type */
-			switch (((180 + 22) - ret->roundabout_delta) / 45) {
-			case 0:
-			case 1:
-				r = type_nav_roundabout_r1;
-				l = type_nav_roundabout_l7;
-				break;
-			case 2:
-				r = type_nav_roundabout_r2;
-				l = type_nav_roundabout_l6;
-				break;
-			case 3:
-				r = type_nav_roundabout_r3;
-				l = type_nav_roundabout_l5;
-				break;
-			case 4:
-				r = type_nav_roundabout_r4;
-				l = type_nav_roundabout_l4;
-				break;
-			case 5:
-				r = type_nav_roundabout_r5;
-				l = type_nav_roundabout_l3;
-				break;
-			case 6:
-				r = type_nav_roundabout_r6;
-				l = type_nav_roundabout_l2;
-				break;
-			case 7:
-				r = type_nav_roundabout_r7;
-				l = type_nav_roundabout_l1;
-				break;
-			case 8:
-				r = type_nav_roundabout_r8;
-				l = type_nav_roundabout_l8;
-				break;
-			}
-			dbg(lvl_debug,"delta %d\n", ret->delta);
-			/* if delta to leave the roundabout (ret->delta) is less than delta to stay in roundabout (dtsir),
-			 * we're exiting to the left, so we're probably in a clockwise roundabout, and vice versa */
-			if (ret->delta < dtsir)
-				ret->maneuver->type = l;
-			else
-				ret->maneuver->type = r;
-
-			/* if leaving roundabout */
-		} else {
-			/* set ret->maneuver->type */
-			if (ret->delta >= min_turn_limit) {
-				/* if the route turns right:
-				 * examine delta to determine strength of turn */
-				if (ret->delta < angle_straight )
-					ret->maneuver->type = type_nav_straight;
-				else if (ret->delta < turn_2_limit)
-					ret->maneuver->type = type_nav_right_1;
-				else if (ret->delta < sharp_turn_limit)
-					ret->maneuver->type = type_nav_right_2;
-				else if (ret->delta < u_turn_limit)
-					ret->maneuver->type = type_nav_right_3;
-				else
-					/* TODO: refine turnaround detection, fall back to type_nav_right_3 */
-					ret->maneuver->type=type_nav_turnaround_right;
-			} else if (ret->delta <= -min_turn_limit) {
-				/* if the route turns left:
-				 * examine delta to determine strength of turn */
-				if (-ret->delta < turn_2_limit)
-					ret->maneuver->type = type_nav_left_1;
-				else if (-ret->delta < sharp_turn_limit)
-					ret->maneuver->type = type_nav_left_2;
-				else if (-ret->delta < u_turn_limit)
-					ret->maneuver->type = type_nav_left_3;
-				else
-					/* TODO: refine turnaround detection, fall back to type_nav_left_3 */
-					ret->maneuver->type=type_nav_turnaround_left;
+					else if (turn_no_of_route_way == 1) {
+						if (ret->delta < -sharp_turn_limit) {
+							ret->maneuver->type = type_nav_left_3;  /* strongly left */
+						} else if (ret->delta <= 0) {
+							ret->maneuver->type = type_nav_left_2;  /* normally left */
+						} else if (ret->delta <= sharp_turn_limit) {
+							ret->maneuver->type = type_nav_right_2; /* normally right */
+						} else {
+							ret->maneuver->type = type_nav_right_3; /* strongly right */
+						}
+					}
+					else if (turn_no_of_route_way > 1) {
+						// if the route is the strongest of all possible turns here
+						if (ret->delta < -u_turn_limit) {
+							ret->maneuver->type = type_nav_turnaround_left; /* turn around left */
+						} else if (ret->delta < -sharp_turn_limit) {
+							ret->maneuver->type = type_nav_left_3;  /* strongly left */
+						} else if (ret->delta <= 0) {
+							ret->maneuver->type = type_nav_left_2;  /* normally left */
+						} else if (ret->delta <= sharp_turn_limit) {
+							ret->maneuver->type = type_nav_right_2; /* normally right */
+						} else if (ret->delta <= u_turn_limit) {
+							ret->maneuver->type = type_nav_right_3; /* strongly right */
+						} else {
+							ret->maneuver->type = type_nav_turnaround_right; /* turn around right */
+						}
+					}
+					break;
+				}
 			} else {
 				/* if the route goes straight:
 				 * If there's another way on one side of the route within 2 * min_turn_limit (not both - the expression below is a logical XOR),
@@ -2653,18 +2809,15 @@ command_new(struct navigation *this_, struct navigation_itm *itm, struct navigat
 		}
 	}
 /*temporary solution to recover some motorway
- *exits that get a (slight)turn left/rigth 
+ *exits that get a (slight)turn left/right 
  */
-		if (itm->way.exit_ref)
+		if (itm && itm->way.exit_ref)
 		{
-			if (ret->delta < 0){
+			if (ret->maneuver->type == type_nav_keep_left || ret->maneuver->type == type_nav_left_1 || ret->maneuver->type == type_nav_left_2)
 				ret->maneuver->merge_or_exit = mex_exit_left;
-			}
-			if (ret->delta > 0){
+
+			if (ret->maneuver->type == type_nav_keep_right || ret->maneuver->type == type_nav_right_1 || ret->maneuver->type == type_nav_right_2)
 				ret->maneuver->merge_or_exit = mex_exit_right;
-			}
-			if (ret->delta < angle_straight )
-				ret->maneuver->type = type_nav_straight;
 		}
 
 	if (this_->cmd_last) {
@@ -3057,7 +3210,7 @@ show_maneuver(struct navigation *nav, struct navigation_itm *itm, struct navigat
 			}
 		}
 	}
-	if (!instruction)
+	if (!instruction && cmd->maneuver)
 	{
 		switch (cmd->maneuver->type)
 		{
@@ -3239,7 +3392,7 @@ show_maneuver(struct navigation *nav, struct navigation_itm *itm, struct navigat
 					instruction=g_strdup_printf(_("You have reached your destination %s"), d);
 				break;
 			default:
-				dbg(lvl_error,"unhandled instruction %s\n",attr_to_name(cmd->maneuver->type));
+				dbg(lvl_error,"unhandled instruction\n");
 				break;
 		}
 	}
@@ -3686,8 +3839,8 @@ navigation_map_item_attr_get(void *priv_data, enum attr_type attr_type, struct a
 		return 0;
 	case attr_street_destination:
 		this_->attr_next=attr_name;
-		if (itm->way.destination && itm->way.destination->destination)
-		this_->str=attr->u.str=select_announced_destinations(cmd);
+		if (cmd && itm->way.destination && itm->way.destination->destination)
+			this_->str=attr->u.str=select_announced_destinations(cmd);
 		else attr->u.str=NULL;
 		if (attr->u.str){
 			return 1;}
@@ -4018,4 +4171,3 @@ struct object_func navigation_func = {
 	(object_func_ref)navit_object_ref,
 	(object_func_unref)navit_object_unref,
 };
-
