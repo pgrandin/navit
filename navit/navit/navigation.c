@@ -1893,6 +1893,11 @@ static int maneuver_category(enum item_type type)
  * access and one-way restrictions of the way against the settings in {@code nav->vehicleprofile}.
  * Turn restrictions are not taken into account.
  *
+ * @param nav The navigation object
+ * @param way The way to examine
+ * @param mode If nonzero, oneway restrictions will be taken into account. If zero, only the vehicle type
+ * will be taken into account.
+ *
  * @return True if entry is permitted, false otherwise. If {@code nav->vehicleprofile} is null, true is returned.
  */
 
@@ -1907,9 +1912,12 @@ static int maneuver_category(enum item_type type)
 static int
 is_way_allowed(struct navigation *nav, struct navigation_way *way, int mode)
 {
-	if (!nav->vehicleprofile)
+	if (!nav->vehicleprofile || !way->flags)
 		return 1;
-	return !way->flags || ((way->flags & (way->dir >= 0 ? nav->vehicleprofile->flags_forward_mask : nav->vehicleprofile->flags_reverse_mask)) == nav->vehicleprofile->flags);
+	if (mode)
+		return ((way->flags & (way->dir >= 0 ? nav->vehicleprofile->flags_forward_mask : nav->vehicleprofile->flags_reverse_mask)) == nav->vehicleprofile->flags);
+	else
+		return ((way->flags & nav->vehicleprofile->flags) == nav->vehicleprofile->flags);
 }
 
 /**
@@ -2375,6 +2383,7 @@ void navigation_analyze_roundabout(struct navigation *this_, struct navigation_c
 					   to the same direction as the route way. Strengthening criterion. */
 	int turn_no_of_route_way = 0;   /* The number of the route way of all ways that turn to the same direction.
 					   Count direction from abs(0 degree) up to abs(180 degree). Strengthening criterion. */
+	int abort;         /* whether a (complex) criterion for aborting a loop has been met */
 
 	/* Find continuation of roundabout after the exit. Don't simply use itm->way.next here, it will break
 	 * if a node in the roundabout is shared by more than one way */
@@ -2388,7 +2397,7 @@ void navigation_analyze_roundabout(struct navigation *this_, struct navigation_c
 		 * cause a crash. For the same reason we're using dtsir with a default value of 0.
 		 */
 
-		/* approximate error for delta2: central angle (=bearing change) of roundabout segment after exit */
+		/* approximate error for delta2: central angle (=bearing change) of roundabout segment after exit (will be refined later) */
 		error2 = abs(angle_delta(itm->prev->angle_end, navigation_way_get_exit_angle(w)));
 
 		dtsir = angle_delta(itm->prev->angle_end, w->angle2);
@@ -2458,6 +2467,7 @@ void navigation_analyze_roundabout(struct navigation *this_, struct navigation_c
 
 			/* examine items before roundabout */
 			itm3 = itm2->prev; /* last segment before roundabout */
+			abort = 0;
 			while (itm3->prev) {
 				if ((itm3->next && is_ramp(&(itm3->next->way)) && !is_ramp(&(itm3->way))) || !(itm3->way.flags & AF_ONEWAYMASK)) {
 					dbg(lvl_debug,"items before roundabout: break because ramp or oneway ends, %dm left\n", dist_left);
@@ -2471,8 +2481,19 @@ void navigation_analyze_roundabout(struct navigation *this_, struct navigation_c
 				d = navigation_way_get_max_delta(&(itm3->way), map_projection(this_->map), itm2->prev->angle_end, dist_left, -1);
 				if ((d != invalid_angle) && (abs(d) > abs(dmax)))
 					dmax = d;
-				if (itm3->way.next) {
-					dbg(lvl_debug,"items before roundabout: break because of potential maneuver, %dm left\n", dist_left);
+				w2 = itm3->way.next;
+				while (w2) {
+					/* Stop examining ways at a turn maneuver (more than one way allowed and route does not follow straightest path) */
+					if (is_way_allowed(this_, w2, 0)
+							&& (abs(angle_delta(angle_opposite(w2->angle2), itm3->way.angle2)) <= abs(angle_delta(itm3->prev->angle_end, itm3->way.angle2)))) {
+						/* FIXME: comparing angles probably does not work well for near-equal angles */
+						abort = 1;
+						break;
+					}
+					w2 = w2->next;
+				}
+				if (abort) {
+					dbg(lvl_debug,"items before roundabout: break because of potential turn maneuver, %dm left\n", dist_left);
 					dist_left = itm3->length;
 					break;
 				}
@@ -2480,24 +2501,25 @@ void navigation_analyze_roundabout(struct navigation *this_, struct navigation_c
 				itm3 = itm3->prev;
 			}
 			if (dist_left == 0) {
-				d = angle_delta(itm3->angle_end, itm2->prev->angle_end);
+				d = angle_delta(itm2->prev->angle_end, itm3->angle_end);
 			} else if (dist_left < itm3->length) {
 				d = navigation_way_get_max_delta(&(itm3->way), map_projection(this_->map), itm2->prev->angle_end, dist_left, -1);
 			} else {
 				/* not enough objects in navigation map, use most distant one
 				 * - or dist_left == itm3->length, this saves a few CPU cycles over the above */
-				d = angle_delta(itm3->way.angle2, itm2->prev->angle_end);
+				d = angle_delta(itm2->prev->angle_end, itm3->way.angle2);
 			}
 			if ((d != invalid_angle) && (abs(d) > abs(dmax)))
 				dmax = d;
 			error1 = abs(dmax);
-			entry_road_angle = itm2->prev->angle_end + dmax;
+			entry_road_angle = (itm2->prev->angle_end + dmax) % 360;
 			dbg(lvl_debug,"entry_road_angle %d (%d + %d)\n", entry_road_angle, itm2->prev->angle_end, dmax);
 
 			/* examine items after roundabout */
 			dmax = 0;
 			dist_left = roundabout_length / 2;
 			itm3 = itm; /* first segment after roundabout */
+			abort = 0;
 			while (itm3->next) {
 				if ((itm3->prev && is_ramp(&(itm3->prev->way)) && !is_ramp(&(itm3->way))) || !(itm3->way.flags & AF_ONEWAYMASK)) {
 					dbg(lvl_debug,"items after roundabout: break because ramp or oneway ends, %dm left\n", dist_left);
@@ -2511,8 +2533,19 @@ void navigation_analyze_roundabout(struct navigation *this_, struct navigation_c
 				d = navigation_way_get_max_delta(&(itm3->way), map_projection(this_->map), itm->way.angle2, dist_left, 1);
 				if ((d != invalid_angle) && (abs(d) > abs(dmax)))
 					dmax = d;
-				if (itm3->next->way.next) {
-					dbg(lvl_debug,"items after roundabout: break because of potential maneuver, %dm left\n", dist_left);
+				w2 = itm3->next->way.next;
+				while (w2) {
+					/* Stop examining ways at a turn maneuver (more than one way allowed and route does not follow straightest path) */
+					if (is_way_allowed(this_, w2, 0)
+							&& (abs(angle_delta(itm3->angle_end, w2->angle2)) <= abs(angle_delta(itm3->angle_end, itm3->next->way.angle2)))) {
+						/* FIXME: comparing angles probably does not work well for near-equal angles */
+						abort = 1;
+						break;
+					}
+					w2 = w2->next;
+				}
+				if (abort) {
+					dbg(lvl_debug,"items after roundabout: break because of potential turn maneuver, %dm left\n", dist_left);
 					dist_left = itm3->length;
 					break;
 				}
@@ -2536,7 +2569,7 @@ void navigation_analyze_roundabout(struct navigation *this_, struct navigation_c
 			 * is negative and the first one takes precedence). */
 			error1 = max((error1 + abs(dmax) + 1) / 2, 2 * (abs(delta1) - 180));
 
-			exit_road_angle = itm->way.angle2 + dmax;
+			exit_road_angle = (itm->way.angle2 + dmax) % 360;
 			dbg(lvl_debug,"exit_road_angle %d (%d + %d)\n", exit_road_angle, itm->way.angle2, dmax);
 
 			dbg(lvl_debug,"delta1 %d error %d\n", delta1, error1);
@@ -2571,6 +2604,8 @@ void navigation_analyze_roundabout(struct navigation *this_, struct navigation_c
 			else
 				cmd->roundabout_delta = (delta1 * error2 + delta2 * error1) / (error1 + error2);
 			cmd->roundabout_delta = (cmd->roundabout_delta + delta3) / 2;
+			/* TODO experimental */
+			cmd->roundabout_delta = delta3;
 			dbg(lvl_debug,"roundabout_delta %d\n", cmd->roundabout_delta);
 		} else {
 			/* we don't know where we entered the roundabout, so we can't calculate delta1 */
