@@ -28,6 +28,7 @@ test:
         pwd: navit/bin/navit/
     - sed -i -e 's@libbinding_dbus.so" active="no"@libbinding_dbus.so" active="yes"@' navit.xml:
         pwd: navit/bin/navit/
+    - echo '<map type="binfile" data="~/assets/california-latest.bin" />' > /home/ubuntu/navit/navit/bin/navit/maps/planet.xml
     - ./navit:
         pwd: navit/bin/navit/
         background: true
