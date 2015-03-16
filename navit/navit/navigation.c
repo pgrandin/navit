@@ -88,20 +88,6 @@ static int roundabout_extra_length=50;
 /* TODO: find out if this is being used elsewhere and, if so, move this definition somewhere more generic */
 static int invalid_angle = 361;
 
-/* FIXME: abandon in favor of min_turn_limit once keep left/right maneuvers are fully implemented */
-static int angle_straight = 2;	/* turns with -angle_straight <= delta <= angle_straight
-								 * will be seen as going straight.
-								 *
-								 * Use a really narrow gap here, fixes already a large number
-								 * of false commands without causing other problems.
-								 *
-								 * During testing it became clear that widening the gap reduces
-								 * even more unwanted 'go right or left' but soon starts to show side-effects.
-								 *
-								 * maybe think of a better name some day.
-								 *
-								 */
-
 /** Minimum absolute delta for a turn.
  * Maneuvers whose absolute delta is less than this will be considered straight */
 static int min_turn_limit = 25;
@@ -299,18 +285,7 @@ struct navigation_command {
 struct navigation_way {
 	struct navigation_way *next;	/**< Pointer to a linked-list of all navigation_ways from this navigation item */
 	short dir;						/**< The direction -1 or 1 of the way */
-	short angle2;					/**< The angle one has to steer to drive from the old item to this street */
-
-
-
-	/*
-	 * (mvglasow) angle2 might be the bearing at the start of the way (0 = north, 90 = east etc.),
-	 * this needs further examination
-	 *
-	 */
-
-
-
+	short angle2;					/**< The bearing at the start or the way (0 = north, 90 =east etc.) */
 	int flags;						/**< The flags of the way */
 	struct item item;				/**< The item of the way */
 	char *name;						/**< The street name ({@code street_name} attribute) */
@@ -322,7 +297,7 @@ struct navigation_way {
 
 struct navigation_itm {
 	struct navigation_way way;
-	int angle_end;                      /* FIXME: is this the bearing at the end of way? */
+	int angle_end;                      /**< The bearing at the end of {@code way} */
 	struct coord start,end;
 	int time;
 	int length;
@@ -337,16 +312,13 @@ struct navigation_itm {
 };
 
 
-/*@brief A linked list conataining the destination of the road
- *
+/**
+ * @brief A linked list containing the destination of the road
  *
  * Holds the destination info from the road, that is the place
  * you drive to if you keep following the road as found on
  * traffic sign's (ex. Paris, Senlis ...)
- *
- *
  */
-
 struct street_destination {
 	struct street_destination *next;
 	char *destination;
@@ -359,12 +331,18 @@ static void navigation_flush(struct navigation *this_);
 
 /**
  * @brief Calculates the delta between two angles
+ *
+ * The return value is to be interpreted as follows:
+ * <ul>
+ * <li>-179..-1: {@code angle2} is left of {@code angle1}</li>
+ * <li>0: Both angles are identical</li>
+ * <li>1..179: {@code angle2} is right of {@code angle1}</li>
+ * <li>180: {@code angle1} is opposite of {@code angle2}</li>
+ * </ul>
  * @param angle1 The first angle
  * @param angle2 The second angle
- * @return The difference between the angles: -179..-1=angle2 is left of angle1,0=same,1..179=angle2 is right of angle1,180=angle1 is opposite of angle2
+ * @return The difference between the angles, see description
  */ 
-
-
 static int
 angle_delta(int angle1, int angle2)
 {
@@ -394,10 +372,10 @@ angle_opposite(int angle)
 	return ((angle+180)%360);
 }
 
-/*@brief : frees a list as constructed with split_string_to_list()
+/**
+ * @brief Frees a list as constructed with split_string_to_list()
  *
- *
- *@param : the list to be freed
+ * @param list the list to be freed
  */
 static void
 free_list(struct street_destination *list) {
@@ -414,20 +392,17 @@ free_list(struct street_destination *list) {
 	}
 }
 
-/*@brief splits a string into a list, the separator to split on can
- * 	be any character, and sets their initial rank to 0
+/**
+ * @brief Splits a string into a list, and sets their initial rank to 0
  *
- *  splits a string into a list, the separator to split on can
- * 	be any character, removes preceding white-space char's and sets
- * 	the initial rank to 0
+ * The separator to split on can be any character. Preceding whitespace
+ * characters will be removed.
  *
- * @param way, a navigation_way holding the list to be fill up
- * @param raw_string, a string to be splitted
- * @param sep, a char to be used as separator to split the raw_string
- * @return an integer, the number of entries in the list
+ * @param way a navigation_way holding the list to be filled up
+ * @param raw_string a string to split
+ * @param sep a char to be used as separator to split the raw_string
+ * @return the number of entries in the list
  */
-
-
 static int
 split_string_to_list(struct navigation_way *way, char* raw_string, char sep)
 {
@@ -475,11 +450,11 @@ split_string_to_list(struct navigation_way *way, char* raw_string, char sep)
 
 
 
-/*@brief returns the first destination with a rank higher than zero,
- * 		 returns the first one in the list if all have rank zero.
+/**
+ * @brief Returns the first destination with a rank higher than zero.
  *
+ * If all items in the list have a zero rank, the first one will be returned.
  */
-
 static struct street_destination *
 get_bestranked(struct street_destination *street_destination)
 {
@@ -495,12 +470,13 @@ get_bestranked(struct street_destination *street_destination)
 	return street_destination;
 }
 
-/*@brief Assigns a high rank to a matching destination in the next
+/**
+ * @brief Assigns a high rank to a matching destination in the next
  * 		command having destination info, and reset existing ranks to zero
  *
- *@param street destination to be given a high rank
- *@param command
- *@return success=1 if succeeded, zero otherwise
+ * @param street destination to be given a high rank
+ * @param command
+ * @return 1 if successful, zero otherwise
  */
 static int
 set_highrank(struct street_destination *street_destination, struct navigation_command *command)
@@ -1513,17 +1489,16 @@ navigation_itm_update(struct navigation_itm *itm, struct item *ritem)
 	itm->speed=speed.u.num;
 }
 
-/*@ brief creates and adds a new navigation_itm to a linked list of such
+/**
+ * @brief Creates and adds a new navigation_itm to a linked list of such
  *
  * routeitem has an attr. streetitem, but that is only and id and a map,
  * allowing to fetch the actual streetitem, that will live under the same name.
  *
- *@ param : the navigation
- *@ param : the routeitem from which to create a navigation item
- *@ return : the new navigation_itm (used nowhere)
- *
+ * @param this_ the navigation object
+ * @param routeitem the routeitem from which to create a navigation item
+ * @return the new navigation_itm (used nowhere)
  */
- 
 static struct navigation_itm *
 navigation_itm_new(struct navigation *this_, struct item *routeitem)
 {
@@ -2346,15 +2321,23 @@ int adjust_delta(int delta, int reference) {
  * Bearing change must be as close as possible to how drivers would perceive it.
  * Builds prior to r2017 used the difference between the last way before and the first way after the roundabout,
  * which tends to overestimate the angle when the ways leading towards and/or away from the roundabout split into
- * separate carriageways in a Y-shape.
+ * separate carriageways in a Y-shape. This is referred to as {@code delta1} here.
  *
  * In r2017 a different approach was introduced, which essentially distorts the roads so they enter and leave
  * the roundabout at a 90 degree angle. (To make calculations simpler, tangents of the roundabout at the entry
  * and exit points are used, with one of them reversed in direction, instead of the approach roads.)
  * However, this approach tends to underestimate the angle when the distance between approach roads is large.
+ * This is referred to as {@code delta2} here.
  *
- * Project HighFive introduced a new approach of combining both previous two approaches, calculating error estimates for each
- * and using a weighted average between the two delta estimates so that the errors cancel each other out as far as possible.
+ * Combining {@code delta1} and {@code delta2}, calculating error estimates for each and using a weighted average between the
+ * two delta estimates gives better results in many cases but fails for certain road layouts - namely, when corresponding
+ * approach roads are connected by more than one roundabout segment, or when additional ways connect to an approach road.
+ * These cases break error calculation and thus weight distribution.
+ *
+ * Project HighFive introduces a new approach, which compares bearings of ways leading towards and away from the
+ * roundabout not immediately at entry and exit but at a certain distance from the roundabout, which is roughly proportional
+ * to the circumference of the roundabout. Circumference is estimated using the arithmetic mean value of {@code delta1} and
+ * {@code delta2}. This approach has produced the best results in tests. In code it is referred to as {@code delta3}.
  *
  * @param this_ The navigation object
  * @param cmd A {@code struct navigation_cmd}, whose {@code delta} and {@code maneuver} members must be set prior to calling
@@ -2363,27 +2346,22 @@ int adjust_delta(int delta, int reference) {
  */
 void navigation_analyze_roundabout(struct navigation *this_, struct navigation_command *cmd, struct navigation_itm *itm) {
 	enum item_type r = type_none, l = type_none;
-	int len = 0; /* length of roundabout segment */
-	int roundabout_length; /* estimated total length of roundabout */
+	int len = 0;                 /* length of roundabout segment */
+	int roundabout_length;       /* estimated total length of roundabout */
 	int angle = 0;
-	int entry_tangent; /* tangent of the roundabout at entry point, against direction of route */
-	int exit_tangent; /* tangent of the roundabout at exit point, in direction of route */
+	int entry_tangent;           /* tangent of the roundabout at entry point, against direction of route */
+	int exit_tangent;            /* tangent of the roundabout at exit point, in direction of route */
 	int entry_road_angle, exit_road_angle; /* angles before and after approach segments */
 	struct navigation_itm *itm2; /* items before itm to examine, up to first roundabout segment on route */
 	struct navigation_itm *itm3; /* items before itm2 and after itm to examine */
-	struct navigation_way *w;    /* continuation of the roundabout after we leave it, or the way in which to turn. */
+	struct navigation_way *w;    /* continuation of the roundabout after we leave it */
 	struct navigation_way *w2;   /* segment of the roundabout leading to the point at which we enter it */
-	int dtsir = 0;     /* delta to stay in roundabout */
-	int d, dmax = 0;   /* when examining deltas of roundabout approaches, current and maximum encountered */
-	int delta1, delta2, error1 = 0, error2; /* for roundabout delta calculated with different approaches, and error margin */
-	int delta3; /* roundabout delta calculated from entry_road_angle and exit_road_angle, currently not used in calculations */
-	int dist_left; /* when examining ways around the roundabout to a certain threshold, the distance we have left to go */
-	int central_angle; /* approximate central angle for the roundabout arc that is part of the route */
-	int more_ways_for_strength = 0; /* Counts the number of ways of the current node that turn
-					   to the same direction as the route way. Strengthening criterion. */
-	int turn_no_of_route_way = 0;   /* The number of the route way of all ways that turn to the same direction.
-					   Count direction from abs(0 degree) up to abs(180 degree). Strengthening criterion. */
-	int abort;         /* whether a (complex) criterion for aborting a loop has been met */
+	int dtsir = 0;               /* delta to stay in roundabout */
+	int d, dmax = 0;             /* when examining deltas of roundabout approaches, current and maximum encountered */
+	int delta1, delta2, delta3;  /* for roundabout delta calculated with different approaches */
+	int dist_left;               /* when examining ways around the roundabout to a certain threshold, the distance we have left to go */
+	int central_angle;           /* approximate central angle for the roundabout arc that is part of the route */
+	int abort;                   /* whether a (complex) criterion for aborting a loop has been met */
 
 	/* Find continuation of roundabout after the exit. Don't simply use itm->way.next here, it will break
 	 * if a node in the roundabout is shared by more than one way */
@@ -2396,9 +2374,6 @@ void navigation_analyze_roundabout(struct navigation *this_, struct navigation_c
 		 * that botched map data (roundabout ending with nowhere else to go) will not
 		 * cause a crash. For the same reason we're using dtsir with a default value of 0.
 		 */
-
-		/* approximate error for delta2: central angle (=bearing change) of roundabout segment after exit (will be refined later) */
-		error2 = abs(angle_delta(itm->prev->angle_end, navigation_way_get_exit_angle(w)));
 
 		dtsir = angle_delta(itm->prev->angle_end, w->angle2);
 		dbg(lvl_debug,"delta to stay in roundabout %d\n", dtsir);
@@ -2422,9 +2397,6 @@ void navigation_analyze_roundabout(struct navigation *this_, struct navigation_c
 
 		/* Calculate entry angle */
 		if (itm2 && w2) {
-			/* improve error estimate for delta2: average of central angles (=bearing change) of the roundabout
-			 * segments before entry and after exit */
-			error2 = (error2 + abs(angle_delta(angle_opposite(itm2->way.angle2), navigation_way_get_exit_angle(w2)))) / 2;
 			entry_tangent = angle_median(angle_opposite(itm2->way.angle2), w2->angle2);
 			dbg(lvl_debug, "entry %d median from %d (%d), %d\n", entry_tangent, angle_opposite(itm2->way.angle2), itm2->way.angle2, itm2->way.next->angle2);
 		} else {
@@ -2433,7 +2405,7 @@ void navigation_analyze_roundabout(struct navigation *this_, struct navigation_c
 		dbg(lvl_debug, "entry %d exit %d\n", entry_tangent, exit_tangent);
 
 		delta2 = angle_delta(entry_tangent, exit_tangent);
-		dbg(lvl_debug, "delta2 %d error %d\n", delta2, error2);
+		dbg(lvl_debug, "delta2 %d\n", delta2);
 
 		if (itm2->prev) {
 			/* If there are V-shaped approach segments and we are turning around or making a sharp turn,
@@ -2454,16 +2426,16 @@ void navigation_analyze_roundabout(struct navigation *this_, struct navigation_c
 
 			/* Approximate roundabout circumference based on len and approximate central angle of route segment.
 			 * The central angle is approximated using the unweighted average of delta1 and delta2,
-			 * which is somewhat crude but should be OK for error estimates. */
+			 * which is somewhat crude but sufficient for our purposes. */
 			central_angle = abs((delta1 + delta2) / 2 + ((cmd->delta < dtsir) ? 180 : -180));
 			roundabout_length = len * 360 / central_angle;
 			dbg(lvl_debug,"roundabout_length = %dm (for central_angle = %d degrees)\n", roundabout_length, central_angle);
 
 			/* in the case of separate carriageways, approach roads become hard to identify, thus we keep a cap on distance.
-			 * Currently this is at most half the length of the roundabout. */
-			/* FIXME: experiment with different values here */
+			 * Currently this is at most half the length of the roundabout, which has worked well in tests but can be tweaked
+			 * to further improve results. */
 			dist_left = roundabout_length / 2;
-			dbg(lvl_debug,"examining roads for up to %dm to estimate error for delta1\n", dist_left);
+			dbg(lvl_debug,"examining roads for up to %dm\n", dist_left);
 
 			/* examine items before roundabout */
 			itm3 = itm2->prev; /* last segment before roundabout */
@@ -2511,7 +2483,6 @@ void navigation_analyze_roundabout(struct navigation *this_, struct navigation_c
 			}
 			if ((d != invalid_angle) && (abs(d) > abs(dmax)))
 				dmax = d;
-			error1 = abs(dmax);
 			entry_road_angle = (itm2->prev->angle_end + dmax) % 360;
 			dbg(lvl_debug,"entry_road_angle %d (%d + %d)\n", entry_road_angle, itm2->prev->angle_end, dmax);
 
@@ -2564,47 +2535,14 @@ void navigation_analyze_roundabout(struct navigation *this_, struct navigation_c
 			if ((d != invalid_angle) && (abs(d) > abs(dmax)))
 				dmax = d;
 
-			/* If delta1 is outside +/-180, this is another input factor for error1.
-			 * Using max() ensures that (if delta1 is within +/-180, the second argument
-			 * is negative and the first one takes precedence). */
-			error1 = max((error1 + abs(dmax) + 1) / 2, 2 * (abs(delta1) - 180));
-
 			exit_road_angle = (itm->way.angle2 + dmax) % 360;
 			dbg(lvl_debug,"exit_road_angle %d (%d + %d)\n", exit_road_angle, itm->way.angle2, dmax);
 
-			dbg(lvl_debug,"delta1 %d error %d\n", delta1, error1);
-
-			/* We now have two approximations delta1 and delta2 with corresponding errors.
-			 * However, deltas are biased as each constitutes a boundary of its possible range.
-			 * We need to correct this so that each delta will be in the middle of its range.
-			 * This requires knowing the direction of the roundabout.
-			 * To avoid mis-guessing, we use two approaches and use results only if both agree.
-			 * Note that we divide the error range by two even if we can't guess the direction.
-			 * While not 100% correct, it has no impact on results as long as the ratio is maintained.
-			 * Adding 1 before dividing ensures we round up. */
-			error1 = (error1 + 1) / 2;
-			error2 = (error2 + 1) / 2;
-			if ((cmd->delta > dtsir) && (delta1 < delta2)) {
-				/* counterclockwise; exit right; delta1 (approach ways) further left (i.e. smaller) than delta2 (tangents) */
-				delta1 += error1;
-				delta2 -= error2;
-				dbg(lvl_debug,"Corrected delta1 %d error %d, delta2 %d error %d\n", delta1, error1, delta2, error2);
-			} else if ((cmd->delta < dtsir) && (delta1 > delta2)) {
-				/* clockwise; exit left; delta1 (approach ways) further right (greater) than delta2 (tangents) */
-				delta1 -= error1;
-				delta2 += error2;
-				dbg(lvl_debug,"Corrected delta1 %d error %d, delta2 %d error %d\n", delta1, error1, delta2, error2);
-			}
+			dbg(lvl_debug,"delta1 %d\n", delta1);
 
 			delta3 = adjust_delta(angle_delta(entry_road_angle, exit_road_angle), delta2);
 			dbg(lvl_debug,"delta3 %d\n", delta3);
 
-			if ((error1 == 0) && (error2 == 0))
-				cmd->roundabout_delta = (delta1 + delta2) / 2;
-			else
-				cmd->roundabout_delta = (delta1 * error2 + delta2 * error1) / (error1 + error2);
-			cmd->roundabout_delta = (cmd->roundabout_delta + delta3) / 2;
-			/* TODO experimental */
 			cmd->roundabout_delta = delta3;
 			dbg(lvl_debug,"roundabout_delta %d\n", cmd->roundabout_delta);
 		} else {
@@ -2664,7 +2602,8 @@ void navigation_analyze_roundabout(struct navigation *this_, struct navigation_c
 /**
  * @brief Creates a new {@code struct navigation_command} for a maneuver.
  *
- * This function also parses {@code maneuver} and sets its {@code type} appropriately so that other
+ * This function creates a new command and inserts it into the command list of {@code this_}.
+ * It also parses {@code maneuver} and sets its {@code type} appropriately so that other
  * functions can rely on that.
  *
  * @param this_ The navigation object
@@ -2672,6 +2611,8 @@ void navigation_analyze_roundabout(struct navigation *this_, struct navigation_c
  * @param maneuver The {@code struct navigation_maneuver} returned by {@code maneuver_required2()}. For the destination,
  * initialize a zeroed-out {@code struct navigation_maneuver} and set its {@code type} member to {@code type_nav_destination}
  * prior to calling this function.
+ *
+ * @return The new command
  */
 static struct navigation_command *
 command_new(struct navigation *this_, struct navigation_itm *itm, struct navigation_maneuver *maneuver)
@@ -2866,6 +2807,13 @@ command_new(struct navigation *this_, struct navigation_itm *itm, struct navigat
 	return ret;
 }
 
+
+/**
+ * @brief Creates turn instructions where needed
+ *
+ * @param this_ The navigation object for which to create turn instructions
+ * @param route Not used
+ */
 static void
 make_maneuvers(struct navigation *this_, struct route *route)
 {
@@ -2936,7 +2884,6 @@ navigation_item_destination(struct navigation *nav, struct navigation_command *c
 	if (nav->speech && speech_get_attr(nav->speech, attr_vocabulary_name_systematic, &attr, NULL))
 		vocabulary2=attr.u.num; /* shall the systematic name be announced? */
 
-
 	/* On motorway links don't announce the name of the ramp as this is done by name_systematic and the street_destination. */
 	if (vocabulary1 && (itm->way.item.type != type_ramp))
 		name=itm->way.name;
@@ -2944,28 +2891,21 @@ navigation_item_destination(struct navigation *nav, struct navigation_command *c
 	if (vocabulary2)
 		name_systematic=itm->way.name_systematic;
 
-
-if (cmd->maneuver && cmd->maneuver->type && ((cmd->maneuver->merge_or_exit==mex_merge_left)
-			||(cmd->maneuver->merge_or_exit==mex_merge_right) ))
-	{
+	if (cmd->maneuver && cmd->maneuver->type && ((cmd->maneuver->merge_or_exit==mex_merge_left)
+			||(cmd->maneuver->merge_or_exit==mex_merge_right) )) {
 		if (name || name_systematic)
-		/* TRANSLATORS: %1$s is the name_systematic of the next road to merge onto, %2$s it's name*/
-		return g_strdup_printf(_("onto the %1$s %2$s"),name_systematic ? name_systematic : "",
-				name ? name : "");
+			/* TRANSLATORS: %1$s is the name_systematic of the next road to merge onto, %2$s it's name*/
+			return g_strdup_printf(_("onto the %1$s %2$s"),name_systematic ? name_systematic : "",
+					name ? name : "");
 		else return g_strdup("");
-
 	}
 
-
 	if(!name && !name_systematic && itm->way.item.type == type_ramp && vocabulary2) {
-			 
 		if(next->way.item.type == type_ramp)
 			return NULL;
 		else
 			return g_strdup_printf("%s%s",prefix,_("into the ramp"));
-
 	}
-
 
 	if (!name && !name_systematic)
 		return NULL;
@@ -2973,8 +2913,6 @@ if (cmd->maneuver && cmd->maneuver->type && ((cmd->maneuver->merge_or_exit==mex_
 		sex=unknown;
 		name1=NULL;
 		for (i = 0 ; i < sizeof(suffixes)/sizeof(suffixes[0]) ; i++) {
-
-
 			if (contains_suffix(name,suffixes[i].fullname)) {
 				sex=suffixes[i].sex;
 				name1=g_strdup(name);
@@ -3033,8 +2971,8 @@ if (cmd->maneuver && cmd->maneuver->type && ((cmd->maneuver->merge_or_exit==mex_
 	return ret;
 }
 
-/* @brief creates turn by turn guidance sentences for the speech and for the route description
- *
+/**
+ * @brief Creates turn by turn guidance sentences for the speech and for the route description
  */
 static char *
 show_maneuver(struct navigation *nav, struct navigation_itm *itm, struct navigation_command *cmd, enum attr_type type, int connect)
@@ -3467,8 +3405,8 @@ show_maneuver(struct navigation *nav, struct navigation_itm *itm, struct navigat
 /**
  * @brief Creates announcements for maneuvers, plus maneuvers immediately following the next maneuver
  *
- * This function does create an announcement for the current maneuver and for maneuvers
- * immediately following that maneuver, if these are too close and we're in speech navigation.
+ * This function creates an announcement for the current maneuver and for maneuvers
+ * immediately following that maneuver, if these are very close and we're in speech navigation.
  *
  * @return An announcement that should be made
  */
@@ -4042,7 +3980,7 @@ navigation_map_rect_destroy(struct map_rect_priv *priv)
  * If {@code maneuver->merge_or_exit} indicates a merge or exit, the result will be of the corresponding
  * merge or exit type.
  *
- * Earlier versions of Navit had the entire logic for setting te maneuver type in this function, but this has
+ * Earlier versions of Navit had the entire logic for setting the maneuver type in this function, but this has
  * been moved to {@code command_new()} so that other functions can use the same results.
  *
  * @param priv The {@code struct map_rect_priv} of the map rect on the navigation map from which an item
@@ -4121,7 +4059,7 @@ navigation_map_get_item(struct map_rect_priv *priv)
  * @param priv The {@code struct map_rect_priv} of the map rect on the navigation map from which an item
  * is to be retrieved.
  * @param id_hi The high part of the ID
- * @param id_lo The low part of the IF
+ * @param id_lo The low part of the ID
  *
  * @return The item, or NULL if an item with the ID specified was not found in the map rectangle
  */
@@ -4206,3 +4144,4 @@ struct object_func navigation_func = {
 	(object_func_ref)navit_object_ref,
 	(object_func_unref)navit_object_unref,
 };
+
