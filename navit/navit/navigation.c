@@ -1617,7 +1617,6 @@ navigation_itm_new(struct navigation *this_, struct item *routeitem)
 		 *  specifically handled, but no occurence known so far either.
 		 *  If present, obtain exit_ref, exit_label and exit_to
 		 *  from the map.
-		 *
 		 */
 		if (streetitem->type == type_ramp )
 		{
@@ -1983,7 +1982,9 @@ maneuver_required2 (struct navigation *nav, struct navigation_itm *old, struct n
 	m.is_same_street = is_same_street2(old->way.name, old->way.name_systematic, new->way.name, new->way.name_systematic);
 
 	dbg(lvl_debug,"enter %p %p %p\n",old, new, maneuver);
-/*	dbg(0,"old=%s %s, new=%s %s, angle old=%d, angle new=%d, d=%i\n ",old->way.name,old->way.name_systematic,new->way.name,new->way.name_systematic,old->angle_end, new->way.angle2,d); */
+#if 0
+	dbg(lvl_debug, "old=%s %s, new=%s %s, angle old=%d, angle new=%d, d=%i\n ", old->way.name, old->way.name_systematic, new->way.name, new->way.name_systematic, old->angle_end, new->way.angle2, d);
+#endif
 	if (!new->way.next || (new->way.next && (new->way.next->angle2 == new->way.angle2) && !new->way.next->next)) {
 		/* No announcement necessary (with extra magic to eliminate duplicate ways) */
 		r="no: Only one possibility";
@@ -2100,35 +2101,37 @@ maneuver_required2 (struct navigation *nav, struct navigation_itm *old, struct n
 			} /* if w... */
 			w = w->next;
 		} /* while w */
-		if (m.num_options <= 1) {
-			if ((abs(m.delta) >= min_turn_limit) && (through_segments == 2)) {
-				/* FIXME: maybe there are cases with more than 2 through_segments...? */
-				/* If we have to make a considerable turn (min_turn_limit or more),
-				 * check whether we are approaching a complex T junction from the "stem"
-				 * (which would need an announcement).
-				 * Complex means that the through road is a dual-carriageway road.
-				 * To find this out, we need to analyze the previous maneuvers.
-				 */
-				int hist_through_segments = 0;
-				int hist_dist = old->length; /* distance between previous and current maneuver */
-				ni = old;
-				while (ni && (hist_through_segments == 0) && (hist_dist <= junction_limit)) {
-					struct navigation_way *w = ni->way.next;
-					while (w) {
-						if ((w->flags & AF_ONEWAYMASK) && (is_same_street2(new->way.name, new->way.name_systematic, w->name, w->name_systematic)))
-							hist_through_segments++;
-						w = w->next;
-					}
-					ni = ni->prev;
-					if (ni)
-						hist_dist += ni->length;
+		if ((abs(m.delta) >= min_turn_limit) && (through_segments >= 2)) {
+			/* If we have to make a considerable turn (min_turn_limit or more),
+			 * check whether we are approaching a complex T junction from the "stem"
+			 * (which would need an announcement).
+			 * Complex means that the through road is a dual-carriageway road.
+			 * This is the case only if at least 2 segments (including new) have the same
+			 * name as new and are one-way, regardless of direction. More than 2 such segments
+			 * are possible e.g. where two physically separated lanes join.
+			 * To find out if there is another carriageway, we need to analyze the previous
+			 * maneuvers.
+			 */
+			int hist_through_segments = 0;
+			int hist_dist = old->length; /* distance between previous and current maneuver */
+			ni = old;
+			while (ni && (hist_through_segments == 0) && (hist_dist <= junction_limit)) {
+				struct navigation_way *w = ni->way.next;
+				while (w) {
+					if (is_same_street2(new->way.name, new->way.name_systematic, w->name, w->name_systematic))
+						hist_through_segments++;
+					w = w->next;
 				}
-				if (hist_through_segments == 2) {
-					/* FIXME: see above for number of through_segments */
-					ret=1;
-					m.is_complex_t_junction = 1;
-					r="yes: turning into dual-carriageway through-road of T junction";
-				}
+				ni = ni->prev;
+				if (ni)
+					hist_dist += ni->length;
+			}
+			if (hist_through_segments >= 2) {
+				/* Require at least 2 segments (there may be more than two in cases such as
+				 * local-express lane systems or separate cycleways) */
+				ret=1;
+				m.is_complex_t_junction = 1;
+				r="yes: turning into multi-carriageway through-road of T junction";
 			}
 		}
 	}
@@ -2199,10 +2202,6 @@ maneuver_required2 (struct navigation *nav, struct navigation_itm *old, struct n
 		 * dlim is 620/256 (roughly 2.5) times the delta of the maneuver */
 		if ((m.max_cat == m.new_cat && m.max_cat == m.old_cat) || (m.new_cat == 0 && m.old_cat == 0))
 			dlim=abs(m.delta)*620/256;
-		/* if both old, new and highest other category differ by no more than 1,
-		 * dlim is just higher than the delta (so another way with a delta of exactly -d will be treated as ambiguous) */
-		else if (max(max(m.old_cat, m.new_cat), m.max_cat) - min(min(m.old_cat, m.new_cat), m.max_cat) <= 1)
-			dlim = abs(m.delta) + 1;
 		/* if both old and new way are in higher than highest encountered category,
 		 * dlim is 128/256 times (i.e. one half) the delta of the maneuver */
 		else if (m.max_cat < m.new_cat && m.max_cat < m.old_cat)
@@ -2212,7 +2211,7 @@ maneuver_required2 (struct navigation *nav, struct navigation_itm *old, struct n
 			m.is_unambiguous = 0;
 		/* if another way is within +/-min_turn_limit and on the same side as new, the maneuver is ambiguous */
 		if (dc != m.delta) {
-			dbg(1,"m.delta %d vs dc %d\n",m.delta,dc);
+			dbg(lvl_debug, "m.delta %d vs dc %d\n", m.delta, dc);
 			m.is_unambiguous=0;
 		}
 		if (!m.is_same_street && m.is_unambiguous < 1) { /* FIXME: why < 1? */
@@ -2894,7 +2893,7 @@ navigation_item_destination(struct navigation *nav, struct navigation_command *c
 	if (cmd->maneuver && cmd->maneuver->type && ((cmd->maneuver->merge_or_exit==mex_merge_left)
 			||(cmd->maneuver->merge_or_exit==mex_merge_right) )) {
 		if (name || name_systematic)
-			/* TRANSLATORS: %1$s is the name_systematic of the next road to merge onto, %2$s it's name*/
+			/* TRANSLATORS: %1$s is the name_systematic of the next road to merge onto, %2$s its name*/
 			return g_strdup_printf(_("onto the %1$s %2$s"),name_systematic ? name_systematic : "",
 					name ? name : "");
 		else return g_strdup("");
@@ -2973,6 +2972,18 @@ navigation_item_destination(struct navigation *nav, struct navigation_command *c
 
 /**
  * @brief Creates turn by turn guidance sentences for the speech and for the route description
+ *
+ * @param nav The navigation object
+ * @param itm The current navigation item, which is used to determine the distance to the next
+ * maneuver. In speech mode this should be set to the navigation item starting at the vehicle's
+ * current position; in route description mode this should be set to the {@code navigation_item}
+ * associated with the previous {@code navigation_command}
+ * @param cmd The {@code navigation_command} for which to generate an announcement
+ * @param type The type of announcements to generate. Set to {@code attr_navigation_long_exact}
+ * to avoid rounding distances, or to {@code attr_navigation_speech} to avoid announcing street
+ * names more than once
+ * @param connect Whether this is the second of two connected announcements, as in "turn left
+ * in..., then turn right"
  */
 static char *
 show_maneuver(struct navigation *nav, struct navigation_itm *itm, struct navigation_command *cmd, enum attr_type type, int connect)
@@ -2980,6 +2991,8 @@ show_maneuver(struct navigation *nav, struct navigation_itm *itm, struct navigat
 
 	int distance=itm->dest_length-cmd->itm->dest_length;
 	char *d=NULL,*ret=NULL;
+	char *exit_announce=NULL;
+	char *exit_side=NULL;
 	char *street_destination_announce=NULL;
 	int level;
 	int skip_roads = 0;
@@ -3124,27 +3137,28 @@ show_maneuver(struct navigation *nav, struct navigation_itm *itm, struct navigat
 					* become too long
 					*/
 				case mex_exit_left:
-					g_free(instruction);
-					if (cmd->itm->way.exit_label)
-						folded_exit_label = linguistics_casefold(cmd->itm->way.exit_label);
-					else folded_exit_label = g_strdup("");
-					folded_street_destination_announce = linguistics_casefold(street_destination_announce);
-					/* TRANSLATORS: the first arg. is distance, the second is exit_ref and the third is exit_label */
-					instruction = g_strdup_printf(_("%1$s left exit %2$s %3$s"),d,cmd->itm->way.exit_ref ? cmd->itm->way.exit_ref : "",
-							(!strstr(folded_street_destination_announce,folded_exit_label)) ? cmd->itm->way.exit_label ? cmd->itm->way.exit_label :"" :"");
-					g_free(folded_exit_label);
-					g_free(folded_street_destination_announce);
-					break;
 				case mex_exit_right:
 					g_free(instruction);
+					exit_side = (cmd->maneuver->merge_or_exit == mex_exit_left) ?
+							g_strdup(_("on your left")) :
+							g_strdup(_("on your right"));
 					if (cmd->itm->way.exit_label)
 						folded_exit_label = linguistics_casefold(cmd->itm->way.exit_label);
 					else folded_exit_label = g_strdup("");
 					folded_street_destination_announce = linguistics_casefold(street_destination_announce);
-					/* TRANSLATORS: the first arg. is distance, the second is exit_ref and the third is exit_label */
-					instruction = g_strdup_printf(_("%1$s right exit %2$s %3$s"),d,cmd->itm->way.exit_ref ? cmd->itm->way.exit_ref : "",
-										(!strstr(folded_street_destination_announce,folded_exit_label)) ?
-												cmd->itm->way.exit_label ? cmd->itm->way.exit_label :"" :"");
+					if ((!strstr(folded_street_destination_announce,folded_exit_label)) && cmd->itm->way.exit_ref)
+						exit_announce = g_strdup_printf(("%1$s %2$s"), cmd->itm->way.exit_ref, cmd->itm->way.exit_label);
+					else if (cmd->itm->way.exit_ref)
+						exit_announce = g_strdup_printf(("%1$s"), cmd->itm->way.exit_ref);
+					else if (cmd->itm->way.exit_label)
+						exit_announce = g_strdup_printf(("%1$s"), cmd->itm->way.exit_label);
+					if (exit_announce)
+						/* TRANSLATORS: the first arg. is exit ref and/or name, the second is the direction of exit and the third is distance */
+						instruction = g_strdup_printf(_("Take exit %1$s %2$s %3$s"), exit_announce, exit_side, d);
+					else
+						/* TRANSLATORS: the first arg. is the direction of exit, the second is distance */
+						instruction = g_strdup_printf(_("Take the exit %1$s %2$s"), exit_side, d);
+					g_free(exit_announce);
 					g_free(folded_exit_label);
 					g_free(folded_street_destination_announce);
 					break;
@@ -3839,7 +3853,7 @@ navigation_map_item_attr_get(void *priv_data, enum attr_type attr_type, struct a
 		if (!attr->u.str && itm->way.exit_label)
 			this_->str=attr->u.str=g_strdup_printf(("%s %s"),_("interchange"),itm->way.exit_label);
 		else if (!attr->u.str && (itm->way.name || itm->way.name_systematic))
-			this_->str=attr->u.str=g_strdup_printf(_("%s %s"),
+			this_->str=attr->u.str=g_strdup_printf(("%s %s"),
 					itm->way.name ? itm->way.name : "",itm->way.name_systematic ? itm->way.name_systematic : "");
 		if (attr->u.str){
 			return 1;}
