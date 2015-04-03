@@ -1,7 +1,7 @@
 dependencies:
   pre:
     - "[ -d ~/assets ] || mkdir ~/assets"
-#    - wget -c -O ~/assets/cov-analysis-linux64-7.6.0.tar.gz http://sd-55475.dedibox.fr/cov-analysis-linux64-7.6.0.tar.gz
+    - wget -c -O ~/assets/cov-analysis-linux64-7.6.0.tar.gz http://sd-55475.dedibox.fr/cov-analysis-linux64-7.6.0.tar.gz
     - wget -c -O ~/assets/libspotify-12.1.51-Linux-x86_64-release.tar.gz https://developer.spotify.com/download/libspotify/libspotify-12.1.51-Linux-x86_64-release.tar.gz
     - wget -c -O ~/assets/california-latest.bin https://circle-artifacts.com/gh/navit-gps/navit/43/artifacts/0/home/ubuntu/assets/binmaps/california-latest.bin
     - tar xvfz ~/assets/libspotify-12.1.51-Linux-x86_64-release.tar.gz
