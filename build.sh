@@ -1,6 +1,6 @@
 cd navit
 tar xfz ~/assets/cov-analysis-linux64-7.6.0.tar.gz
-export PATH=~/navit/cov-analysis-linux64-7.6.0/bin:$PATH
+export PATH=~/navit/navit/cov-analysis-linux64-7.6.0/bin:$PATH
 
 mkdir bin && cd bin
 cov-build --dir cov-int cmake ../ -Dgraphics/qt_qpainter:BOOL=FALSE -Dgui/qml:BOOL=FALSE
