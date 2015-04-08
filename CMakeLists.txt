@@ -149,6 +149,9 @@ find_package(DBusGLib)
 find_package(PythonLibs)
 find_package(OpenSSL)
 find_package(Threads)
+find_package(libspotify)
+find_package(ALSA)
+find_package(Jansson)
 libfind_pkg_check_modules(FONTCONFIG fontconfig)
 #Qt detection
 if (NOT DISABLE_QT)
@@ -438,6 +441,17 @@ add_feature(USE_ROUTING "default" TRUE)
 add_feature(USE_SVG "default" TRUE)
 add_feature(SVG2PNG "default" TRUE)
 add_feature(SAMPLE_MAP "default" TRUE)
+add_feature(USE_SPOTIFY "default" FALSE)
+add_feature(USE_GOOGLEPLACES "default" FALSE)
+
+if (JANSSON_FOUND)
+       set_with_reason(USE_GOOGLEPLACES "jansson found" TRUE)#
+#       set_with_reason(USE_FOURSQUARE "jansson found" TRUE)#
+       SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -u fetch_url_to_string ")
+else (JANSSON_FOUND)
+       set_with_reason(USE_GOOGLEPLACES "jansson not found" FALSE)
+#       set_with_reason(USE_FOURSQUARE "jansson not found" FALSE)
+endif (JANSSON_FOUND)
 
 IF(NOT svg2png_scaling)
    IF(NOT ANDROID)

@@ -36,6 +36,9 @@
 #include "gui_internal_search.h"
 #include "gui_internal_poi.h"
 #include "gui_internal_command.h"
+#ifdef USE_GOOGLEPLACES
+#include "gui_internal_googlesearch.h"
+#endif
 
 extern char *version;
 
@@ -1168,7 +1171,6 @@ gui_internal_cmd2(struct gui_priv *this, char *function, struct attr **in, struc
 		gui_internal_cmd2_waypoints(this, function, in, out, valid);
 	else if(!strcmp(function, "about"))
 		gui_internal_cmd2_about(this, function, in, out, valid);
-
 	if(entering)
 		graphics_draw_mode(this->gra, draw_mode_end);
 }
@@ -1203,6 +1205,9 @@ static struct command_table commands[] = {
 	{"waypoints",command_cast(gui_internal_cmd2)},
 	{"write",command_cast(gui_internal_cmd_write)},
 	{"about",command_cast(gui_internal_cmd2)},
+#ifdef USE_GOOGLEPLACES
+        {"googlesearch_search", command_cast (gui_internal_googlesearch_search)},
+#endif
 
 };
 
