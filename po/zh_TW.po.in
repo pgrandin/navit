@@ -1,15 +1,16 @@
 # Chinese (Traditional) translations for navit
-# Copyright (C) 2006-2016 The Navit Team
+# Copyright (C) 2006-2017 The Navit Team
 # This file is distributed under the same license as the navit package.
 # Many thanks to the contributors of this translation:
+# Po-Hsu Lin https://launchpad.net/~cypressyew
 # icefirewu https://launchpad.net/~icefirewu
 
 msgid ""
 msgstr ""
 "Project-Id-Version: navit\n"
 "Report-Msgid-Bugs-To: FULL NAME <EMAIL@ADDRESS>\n"
-"PO-Revision-Date: 2016-09-12 15:23+0000\n"
-"Last-Translator: icefirewu <icefirewu@gmail.com>\n"
+"PO-Revision-Date: 2017-04-25 10:36+0000\n"
+"Last-Translator: Po-Hsu Lin <po-hsu.lin@canonical.com>\n"
 "Language-Team: Chinese (Traditional) <zh_TW@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -1585,7 +1586,7 @@ msgid "Test"
 msgstr "測試"
 
 msgid "_Quit"
-msgstr "_退出"
+msgstr "退出(_Q)"
 
 msgid "Quit the application"
 msgstr "結束本程式"
@@ -1963,11 +1964,20 @@ msgstr "版面佈局"
 msgid "Height Profile"
 msgstr "高度資料"
 
+msgid "please install a map *.heightlines.bin to provide elevationdata"
+msgstr ""
+
+msgid "The route must cross at least 2 heightlines"
+msgstr ""
+
 msgid "Route Description"
 msgstr "路徑敘述"
 
 msgid "Show Locale"
 msgstr "顯示語言環境"
+
+msgid "Network info"
+msgstr ""
 
 msgid "Former Destinations"
 msgstr "歷來目的地"
@@ -2754,3 +2764,13 @@ msgid ""
 "currently selected engine reports it is unable to speak in your language. "
 "Should we ask the system to show voice download dialog?"
 msgstr "Navit 可使用所有已安裝之文轉音引擎. 現在選定的引擎表示無法依照您的語言發音. 要顯示語音下載對話框嗎?"
+
+#. Android resource: @strings/permissions_not_granted
+msgid ""
+"Navit needs permission to access GPS and read the map.\n"
+"If you change your mind please restart Navit and grant the permissions"
+msgstr ""
+
+#. Android resource: @strings/permissions_info_box_title
+msgid "One or more ungranted permissions"
+msgstr ""
