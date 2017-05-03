@@ -1,11 +1,12 @@
 # Čeština translations for navit
-# Copyright (C) 2006-2016 The Navit Team
+# Copyright (C) 2006-2017 The Navit Team
 # This file is distributed under the same license as the navit package.
 # Many thanks to the contributors of this translation:
 # 72ka https://launchpad.net/~2hp
 # Aleš Janda https://launchpad.net/~kyblicek
 # Ivan Kološ https://launchpad.net/~ivan-kolos
 # Jakuje https://launchpad.net/~jakuje
+# Jiří Holubčík https://launchpad.net/~jery
 # MMlosh https://launchpad.net/~mmlosh
 # Marc0 https://launchpad.net/~z-ubuntuone-y
 # Mike Crash https://launchpad.net/~mike-mikecrash
@@ -22,8 +23,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: navit 0.5.0\n"
 "Report-Msgid-Bugs-To: \n"
-"PO-Revision-Date: 2016-07-12 16:13+0000\n"
-"Last-Translator: Pavel Borecki <Unknown>\n"
+"PO-Revision-Date: 2017-04-10 20:41+0000\n"
+"Last-Translator: Jiří Holubčík <Unknown>\n"
 "Language-Team: Čeština\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -371,7 +372,7 @@ msgstr "Otočte se %1$s"
 #. *
 #. 
 msgid "follow"
-msgstr ""
+msgstr "následujte"
 
 msgid "then you have reached your destination."
 msgstr "pak budete v cíli."
@@ -1592,7 +1593,7 @@ msgid "Opens address search dialog"
 msgstr "Otevře vyhledávání adres"
 
 msgid "_POI search"
-msgstr ""
+msgstr "_POI hledat"
 
 msgid "Opens POI search dialog"
 msgstr "Otevře dialog vyhledávání POI"
@@ -1689,7 +1690,7 @@ msgstr "Vzdálenost od středu mapy (km)"
 
 #, c-format
 msgid "POI %s. %s"
-msgstr ""
+msgstr "POI %s. %s"
 
 #, c-format
 msgid "Set destination to %ld, %ld \n"
@@ -1993,6 +1994,9 @@ msgstr "Popis trasy"
 
 msgid "Show Locale"
 msgstr "Zobrazit jazyk"
+
+msgid "Network info"
+msgstr ""
 
 msgid "Former Destinations"
 msgstr "Minulé cíle"
@@ -2780,6 +2784,16 @@ msgid ""
 "Navit can use any text to speech engine installed on your device. The "
 "currently selected engine reports it is unable to speak in your language. "
 "Should we ask the system to show voice download dialog?"
+msgstr ""
+
+#. Android resource: @strings/permissions_not_granted
+msgid ""
+"Navit needs permission to access GPS and read the map.\n"
+"If you change your mind please restart Navit and grant the permissions"
+msgstr ""
+
+#. Android resource: @strings/permissions_info_box_title
+msgid "One or more ungranted permissions"
 msgstr ""
 
 #, c-format
