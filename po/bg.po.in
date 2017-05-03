@@ -1,5 +1,5 @@
 # Bulgarian translations for navit
-# Copyright (C) 2006-2015 The Navit Team
+# Copyright (C) 2006-2017 The Navit Team
 # This file is distributed under the same license as the navit package.
 # Many thanks to the contributors of this translation:
 # Alex Stanev https://launchpad.net/~realender
@@ -7,13 +7,14 @@
 # Anton Todorov https://launchpad.net/~antod
 # Lyudmil Bonev https://launchpad.net/~bonev-j
 # MalamiR https://launchpad.net/~mamut-killer
+# Martin Voinov https://launchpad.net/~mvoinov
 
 msgid ""
 msgstr ""
 "Project-Id-Version: navit 0.5.0\n"
 "Report-Msgid-Bugs-To: \n"
-"PO-Revision-Date: 2015-07-19 03:57+0000\n"
-"Last-Translator: Alex Stanev <alex@stanev.org>\n"
+"PO-Revision-Date: 2016-05-12 08:43+0000\n"
+"Last-Translator: Martin Voinov <mvoinov@gmail.com>\n"
 "Language-Team: Bulgarian <bg@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -23,7 +24,7 @@ msgstr ""
 "X-Report-Errors: https://translations.launchpad.net/navit/trunk/+pots/navit\n"
 
 msgid "Running from source directory\n"
-msgstr ""
+msgstr "стартиране от главната директория\n"
 
 #, c-format
 msgid "setting '%s' to '%s'\n"
@@ -75,35 +76,33 @@ msgstr "шестия изход"
 
 #, c-format
 msgid "%d feet"
-msgstr ""
+msgstr "%d фута"
 
 #, c-format
 msgid "in %d feet"
-msgstr ""
+msgstr "след %d фута"
 
 #, c-format
 msgid "%d.%d miles"
-msgstr ""
+msgstr "%d.%d мили"
 
 #, c-format
 msgid "in %d.%d miles"
-msgstr ""
+msgstr "след %d.%d мили"
 
 #, c-format
 msgid "one mile"
 msgid_plural "%d miles"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "%d мили"
 
 #, c-format
 msgid "in one mile"
 msgid_plural "in %d miles"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "след %d миля"
 
 #, c-format
 msgid "%d meters"
-msgstr "%d метра"
+msgstr ""
 
 #, c-format
 msgid "in %d meters"
@@ -189,7 +188,7 @@ msgstr "Когато е възможно обърнете"
 #. TRANSLATORS: the argument is the destination to follow
 #, c-format
 msgid "towards %s"
-msgstr ""
+msgstr "към %s"
 
 #, c-format
 msgid "Follow the road for the next %s"
@@ -204,7 +203,7 @@ msgid "Enter the roundabout %s"
 msgstr "Навлизате в кръгово %s"
 
 msgid "then enter the roundabout"
-msgstr ""
+msgstr "след това навлезте в кръговото движение"
 
 #. TRANSLATORS: first arg. is the manieth exit, second arg. is the destination to follow
 #, c-format
@@ -241,57 +240,57 @@ msgid "Merge %1$s%2$s|left"
 msgstr ""
 
 msgid "on your left"
-msgstr ""
+msgstr "ваше ляво"
 
 msgid "on your right"
-msgstr ""
+msgstr "ваше дясно"
 
 #. TRANSLATORS: the first arg. is exit ref and/or name, the second is the direction of exit and the third is distance
 #, c-format
 msgid "Take exit %1$s %2$s %3$s"
-msgstr ""
+msgstr "вземете изход %1$s %2$s %3$s"
 
 #. TRANSLATORS: the first arg. is the direction of exit, the second is distance, the third is destination
 #, c-format
 msgid "Take the exit %1$s %2$s%3$s"
-msgstr ""
+msgstr "вземете изхода %1$s %2$s %3$s"
 
 #. TRANSLATORS: as in "Keep right at interchange 42 Greenmond-West"
 msgid "at interchange"
-msgstr ""
+msgstr "при обмен"
 
 msgid "at exit"
-msgstr ""
+msgstr "на изхода"
 
 #. TRANSLATORS: the arg. is where to do the maneuver
 #, c-format
 msgid "then continue straight%1$s"
-msgstr ""
+msgstr "след това продължете%1$s"
 
 #. TRANSLATORS: the first arg. is distance, the second is where to do the maneuver, the third is destination
 #, c-format
 msgid "Continue straight %1$s%2$s%3$s"
-msgstr ""
+msgstr "продължете направо %1$s%2$s%3$s"
 
 #. TRANSLATORS: the arg. is where to do the maneuver
 #, c-format
 msgid "then keep right%1$s"
-msgstr ""
+msgstr "след това дръжте в дясно %1$s"
 
 #. TRANSLATORS: the first arg. is distance, the second is where to do the maneuver, the third is destination
 #, c-format
 msgid "Keep right %1$s%2$s%3$s"
-msgstr ""
+msgstr "дръжте в дясно %1$s%2$s%3$s"
 
 #. TRANSLATORS: the arg. is where to do the maneuver
 #, c-format
 msgid "then keep left%1$s"
-msgstr ""
+msgstr "след това дръжте в ляво%1$s"
 
 #. TRANSLATORS: the first arg. is distance, the second is where to do the maneuver, the third is destination
 #, c-format
 msgid "Keep left %1$s%2$s%3$s"
-msgstr ""
+msgstr "дръжте в ляво%1$s%2$s%3$s"
 
 #. TRANSLATORS: "right" as in "turn right"
 msgid "right"
@@ -357,7 +356,7 @@ msgstr "Обърнете %1$s"
 #. *
 #. 
 msgid "follow"
-msgstr ""
+msgstr "следвайте"
 
 msgid "then you have reached your destination."
 msgstr "след това пристигате на местоназначението"
@@ -369,7 +368,7 @@ msgstr "Достигнахте до целта %s"
 
 #. TRANSLATORS: Exit as a noun, as in "Exit 43 Greenmound-East"
 msgid "Interchange"
-msgstr ""
+msgstr "обмен"
 
 msgid "Exit"
 msgstr "Изход"
@@ -1966,10 +1965,19 @@ msgstr "Изглед"
 msgid "Height Profile"
 msgstr "Височинен профил"
 
+msgid "please install a map *.heightlines.bin to provide elevationdata"
+msgstr ""
+
+msgid "The route must cross at least 2 heightlines"
+msgstr ""
+
 msgid "Route Description"
 msgstr "Описание на маршрута"
 
 msgid "Show Locale"
+msgstr ""
+
+msgid "Network info"
 msgstr ""
 
 msgid "Former Destinations"
@@ -2021,10 +2029,6 @@ msgstr ""
 msgid "Towns"
 msgstr ""
 
-#. Android resource: @strings/position_popup_drive_here
-msgid "Route to here"
-msgstr ""
-
 msgid "Map data (c) OpenStreetMap contributors, ODBL"
 msgstr ""
 
@@ -2040,6 +2044,10 @@ msgstr ""
 msgid ""
 "Sorry, we currently do not support maps above 3.8G on Android, please select "
 "a smaller one."
+msgstr ""
+
+#. Android resource: @strings/position_popup_drive_here
+msgid "Route to here"
 msgstr ""
 
 msgid "Cancel"
@@ -2502,6 +2510,9 @@ msgstr "Цял екран"
 msgid "Window Mode"
 msgstr "Режим Прозорец"
 
+msgid "Layers"
+msgstr ""
+
 msgid "Description"
 msgstr "Описание"
 
@@ -2736,6 +2747,16 @@ msgid ""
 "Navit can use any text to speech engine installed on your device. The "
 "currently selected engine reports it is unable to speak in your language. "
 "Should we ask the system to show voice download dialog?"
+msgstr ""
+
+#. Android resource: @strings/permissions_not_granted
+msgid ""
+"Navit needs permission to access GPS and read the map.\n"
+"If you change your mind please restart Navit and grant the permissions"
+msgstr ""
+
+#. Android resource: @strings/permissions_info_box_title
+msgid "One or more ungranted permissions"
 msgstr ""
 
 #, c-format
