@@ -53,7 +53,7 @@ tar xzf ~/tomtom_assets/toolchain_redhat_gcc-3.3.4_glibc-2.3.2-20060131a.tar.gz 
 cd /tmp
 # this one includes the precompiled voices
 wget -nv -c http://freefr.dl.sourceforge.net/project/espeak/espeak/espeak-1.48/espeak-1.48.04-source.zip
-unzip espeak-1.48.04-source.zip
+unzip -q espeak-1.48.04-source.zip
 cd espeak-1.48.04-source
 sed -i "s/PREFIX=\/usr//g" src/Makefile
 sed -i "s/DATADIR=\/usr\/share\/espeak-data/DATADIR=~\/share\/espeak-data/g" src/Makefile
