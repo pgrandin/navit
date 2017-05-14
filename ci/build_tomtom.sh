@@ -328,13 +328,13 @@ mkdir -p fonts
 cd ..
 
 # navit executable
-cp $PREFIX/bin/navit bin/
+cp $PREFIX/bin/navit ${OUT_PATH}/navit/bin/
 
 # fonts
 cp -r ~/navit/navit/fonts/*.ttf $OUT_PATH/navit/share/fonts
 
 # images and xml
-cd share
+cd ${OUT_PATH}/navit/share
 mkdir xpm
 cd xpm
 cp $PREFIX/share/navit/xpm/*16.png ./
@@ -375,7 +375,7 @@ mkdir -p lib sdl ts
 cd ..
 
 # navit executable with espeak enabled
-cp $PREFIX/bin/navit bin/
+cp $PREFIX/bin/navit ${OUT_PATH}/navit/bin/
 
 cp $PREFIX/lib/libfreetype.so.6 lib
 cp $PREFIX/lib/libSDL-1.2.so.0 lib
