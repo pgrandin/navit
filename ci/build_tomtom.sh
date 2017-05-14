@@ -7,10 +7,9 @@
 set -e
 
 export ARCH=arm-linux
-cp Toolchain/$ARCH.cmake /tmp
 
 # toolchain
-export TOMTOM_SDK_DIR=/opt/tomtom-sdk
+export TOMTOM_SDK_DIR=/tmp/tomtom-sdk
 mkdir -p $TOMTOM_SDK_DIR >/dev/null 2>&1 || export TOMTOM_SDK_DIR=$HOME/tomtom-sdk 
 export PREFIX=$TOMTOM_SDK_DIR/gcc-3.3.4_glibc-2.3.2/$ARCH/sys-root
 export PATH=$TOMTOM_SDK_DIR/gcc-3.3.4_glibc-2.3.2/bin:$PREFIX/bin/:$PATH
@@ -305,11 +304,10 @@ EOF
 
 # navit
 cd ~/navit
-sed -i "s|set ( TOMTOM_SDK_DIR /opt/tomtom-sdk )|set ( TOMTOM_SDK_DIR $TOMTOM_SDK_DIR )|g" /tmp/$ARCH.cmake
 mkdir -p build
 cd build
 cmake ../ -DCMAKE_INSTALL_PREFIX=$PREFIX -DFREETYPE_INCLUDE_DIRS=$PREFIX/include/freetype2/ -Dsupport/gettext_intl=TRUE \
--DHAVE_API_TOMTOM=TRUE -DXSLTS=tomtom -DAVOID_FLOAT=TRUE -Dmap/mg=FALSE -DUSE_PLUGINS=0 -DCMAKE_TOOLCHAIN_FILE=/tmp/$ARCH.cmake \
+-DHAVE_API_TOMTOM=TRUE -DXSLTS=tomtom -DAVOID_FLOAT=TRUE -Dmap/mg=FALSE -DUSE_PLUGINS=0 \
 -DDISABLE_QT=ON -DSAMPLE_MAP=n -DBUILD_MAPTOOL=n -Dspeech/espeak=FALSE
 make -j$JOBS
 make install
@@ -357,11 +355,10 @@ zip -r $CIRCLE_ARTIFACTS/navit_tomtom_minimal.zip navit
 
 # navit
 cd ~/navit
-sed -i "s|set ( TOMTOM_SDK_DIR /opt/tomtom-sdk )|set ( TOMTOM_SDK_DIR $TOMTOM_SDK_DIR )|g" /tmp/$ARCH.cmake
 mkdir -p build
 cd build
 cmake ../ -DCMAKE_INSTALL_PREFIX=$PREFIX -DFREETYPE_INCLUDE_DIRS=$PREFIX/include/freetype2/ -Dsupport/gettext_intl=TRUE \
--DHAVE_API_TOMTOM=TRUE -DXSLTS=tomtom -DAVOID_FLOAT=TRUE -Dmap/mg=FALSE -DUSE_PLUGINS=0 -DCMAKE_TOOLCHAIN_FILE=/tmp/$ARCH.cmake \
+-DHAVE_API_TOMTOM=TRUE -DXSLTS=tomtom -DAVOID_FLOAT=TRUE -Dmap/mg=FALSE -DUSE_PLUGINS=0 \
 -DDISABLE_QT=ON -DSAMPLE_MAP=n -DBUILD_MAPTOOL=n
 make -j$JOBS
 make install
