@@ -10,7 +10,6 @@ export ARCH=arm-linux
 
 # toolchain
 export TOMTOM_SDK_DIR=/tmp/tomtom-sdk
-mkdir -p $TOMTOM_SDK_DIR >/dev/null 2>&1 || export TOMTOM_SDK_DIR=$HOME/tomtom-sdk 
 export PREFIX=$TOMTOM_SDK_DIR/gcc-3.3.4_glibc-2.3.2/$ARCH/sys-root
 export PATH=$TOMTOM_SDK_DIR/gcc-3.3.4_glibc-2.3.2/bin:$PREFIX/bin/:$PATH
 export CFLAGS="-O2 -I$PREFIX/include -I$PREFIX/usr/include"
@@ -32,6 +31,7 @@ echo "Jobs"
 echo $JOBS
 
 mkdir -p ~/assets/tomtom
+mkdir -p $TOMTOM_SDK_DIR
 
 if ! [ -e "~/assets/tomtom/toolchain_redhat_gcc-3.3.4_glibc-2.3.2-20060131a.tar.gz" ]
  then 
@@ -45,7 +45,6 @@ fi
 
 # toolchain
 cd /tmp
-mkdir -p $TOMTOM_SDK_DIR
 tar xzf ~/assets/tomtom/toolchain_redhat_gcc-3.3.4_glibc-2.3.2-20060131a.tar.gz -C $TOMTOM_SDK_DIR
 
 # espeak
@@ -62,117 +61,6 @@ cat src/Makefile
 make -C src
 cd src
 make install
-
-# http://forum.navit-project.org/viewtopic.php?f=17&t=568
-cd /tmp
-cat > /tmp/espeakdsp.c << EOF
-#include <fcntl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/soundcard.h>
-#include <sys/wait.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-
-#define IBUFFERLEN 1024
-#define MAXARGC 30
-
-
-int  main(int argc, char *argv[],char *envp[])
-{
-	int pipefd[2];
-	pid_t cpid;
-	char buf;
-	int co,wp,l,fh;
-	short bufi[IBUFFERLEN],bufo[IBUFFERLEN*2];	 
-	int rate=22050;
-
-	char *newargv[MAXARGC+2];
-
-	for(co=0;co<argc;co++)
-	{
-		if(co>=MAXARGC)break;
-		newargv[co]=argv[co];
-	}
-	newargv[co++]="--stdout";
-	newargv[co++]=NULL;
-
-	if (pipe(pipefd) == -1)
-	{
-		perror("pipe");
-		exit(EXIT_FAILURE);
-	}
-
-	if(setpriority(PRIO_PROCESS,0,-10))
-	perror ("setpriority");
-
-	cpid = fork();
-	if (cpid == -1)
-	{
-		perror("fork");
-		exit(EXIT_FAILURE);
-	}
-
-	if (cpid == 0)
-	{    /* Child writes to pipe */
-
-		close(pipefd[0]);          /* Close unused read end */
-		dup2(pipefd[1],1);	
-		execve("/mnt/sdcard/navit/bin/espeak",newargv,envp);	      
-		perror("exec /mnt/sdcard/navit/bin/espeak");	
-		close(pipefd[1]);          /* Reader will see EOF */
-		wait(NULL);                /* Wait for child */
-		exit(EXIT_SUCCESS);
-
-	} else { /* Parent read from  pipe */
-
-		close(pipefd[1]);          /* Close unused write end */
-
-		l=read(pipefd[0],bufi,64);
-		if(memcmp(bufi,"RIFF",4))
-		{
-			while(l>0)
-			{
-				write(1,bufi,l);
-				l=read(pipefd[0],bufi,IBUFFERLEN);
-			}
-			exit(EXIT_SUCCESS);
-		}
-		l=read(pipefd[0],bufi,IBUFFERLEN);
-		if(l<500)
-		{
-			printf("espeakdsp: avoid noise speaking a empty string\n");
-			exit(EXIT_SUCCESS); 	
-		} 			
-		usleep (50000);
-
-		fh=open("/dev/dsp",O_WRONLY);
-		if(fh<0)
-		{
-			perror("open /dev/dsp");	
-			exit(EXIT_FAILURE);
-		}
-		ioctl(fh, SNDCTL_DSP_SPEED , &rate);
-		ioctl(fh, SNDCTL_DSP_SYNC, 0);
-		while(l)
-		{
-			for(co=0,wp=0;co<IBUFFERLEN;co++)
-			{
-				bufo[wp++]=bufi[co]; /* mono->stereo */
-				bufo[wp++]=bufi[co];
-			}
-			write (fh,bufo,wp);
-			l=read(pipefd[0],bufi,IBUFFERLEN);
-		}
-		ioctl(fh, SNDCTL_DSP_SYNC, 0);
-		close(pipefd[0]);
-		exit(EXIT_SUCCESS);
-	}
-}
-EOF
-arm-linux-gcc -O2 -I$PREFIX/include -I$PREFIX/usr/include espeakdsp.c -o espeakdsp
 
 # zlib
 cd /tmp
@@ -467,7 +355,8 @@ cp -r ~/share/espeak-data ./
 cp $PREFIX/bin/espeak $OUT_PATH/navit/bin/
 cp $PREFIX/lib/libespeak.so.1 $OUT_PATH/navit/lib
 
-mv /tmp/espeakdsp $OUT_PATH/navit/bin/
+# http://forum.navit-project.org/viewtopic.php?f=17&t=568
+arm-linux-gcc -O2 -I$PREFIX/include -I$PREFIX/usr/include ~/navit/contrib/tomtom/espeakdsp.c -o $OUT_PATH/navit/bin/espeakdsp
 
 # add a menu button
 cat > $OUT_PATH/SDKRegistry/navit.cap << EOF
