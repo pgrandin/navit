@@ -1,5 +1,5 @@
 #!/bin/sh
-# this builds a plugin for tomtom
+# this builds two images for tomtom, a minimal one, and one that can be used as a plugin
 # in case you want to build a standalone system
 # https://github.com/george-hopkins/opentom
 # https://github.com/gefin/opentom
@@ -267,7 +267,7 @@ make install
 cd test
 ./configure --prefix=$PREFIX --host=$ARCH
 make testvidinfo
-cp testvidinfo $PREFIX/usr/bin/
+cp testvidinfo /tmp
 
 # to find sdl-config
 export PATH=$PREFIX/bin:$PATH
@@ -317,14 +317,50 @@ make install
 cd ..
 
 
-# creating directories
-OUT_PATH="${TMP_DIR}/tomtom/sdcard"
+# First, pack the navit-tomtom-minimal archive
+OUT_PATH="/tmp/tomtom/sdcard"
 rm -rf $OUT_PATH
 mkdir -p $OUT_PATH
 cd $OUT_PATH
-mkdir -p navit SDKRegistry
+mkdir -p navit
 cd navit
-mkdir -p bin lib share sdl ts
+mkdir -p bin share
+cd share 
+mkdir -p fonts
+cd ..
+
+# navit executable
+cp $PREFIX/bin/navit bin/
+
+# fonts
+cp -r ~/navit/navit/fonts/*.ttf $OUT_PATH/navit/share/fonts
+
+# images and xml
+cd share
+mkdir xpm
+cd xpm
+cp $PREFIX/share/navit/xpm/*16.png ./
+cp $PREFIX/share/navit/xpm/*32.png ./
+cp $PREFIX/share/navit/xpm/*48.png ./
+cp $PREFIX/share/navit/xpm/*64.png ./
+cp $PREFIX/share/navit/xpm/nav*.* ./
+cp $PREFIX/share/navit/xpm/country*.png ./
+cd ..
+cp $PREFIX/share/navit/navit.xml ./tomtom480.xml
+mkdir -p maps
+
+# locale
+cp -r $PREFIX/share/locale ./
+
+cd $OUT_PATH
+zip -r $CIRCLE_ARTIFACTS/navit_tomtom_minimal.zip navit
+
+# Then add content required for the plugin build
+# creating directories
+cd $OUT_PATH
+mkdir -p SDKRegistry
+cd navit
+mkdir -p lib sdl ts
 cd share 
 mkdir -p fonts
 cd ..
@@ -346,14 +382,10 @@ cp $PREFIX/lib/libz.so.1 lib
 cp $PREFIX/etc/ts.conf ts
 cp $TOMTOM_SDK_DIR/gcc-3.3.4_glibc-2.3.2/$ARCH/lib/libstdc++.so.5 lib
 
-# flite
-# cp $PREFIX/bin/flite* bin/
-
 # SDL testvidinfo
 cp $PREFIX/usr/bin/testvidinfo sdl/
 
-# navit executable and wrapper
-cp $PREFIX/bin/navit bin/
+# navit wrapper
 cat > bin/navit-wrapper << 'EOF'
 #!/bin/sh
 
@@ -418,30 +450,9 @@ done
 EOF
 chmod a+rx bin/navit-wrapper
 
-# fonts
-cp -r ~/navit/navit/fonts/*.ttf $OUT_PATH/navit/share/fonts
-
 # ts
 cp -r $PREFIX/lib/ts $OUT_PATH/navit/lib/
 cp $PREFIX/bin/ts_* $OUT_PATH/navit/ts/
-
-# images and xml
-cd share
-mkdir xpm
-cd xpm
-cp $PREFIX/share/navit/xpm/*16.png ./
-cp $PREFIX/share/navit/xpm/*32.png ./
-cp $PREFIX/share/navit/xpm/*48.png ./
-cp $PREFIX/share/navit/xpm/*64.png ./
-cp $PREFIX/share/navit/xpm/nav*.* ./
-cp $PREFIX/share/navit/xpm/country*.png ./
-cd ..
-cp $PREFIX/share/navit/navit.xml ./tomtom480.xml
-mkdir -p maps
-
-
-# locale
-cp -r $PREFIX/share/locale ./
 
 # espeak
 cp -r ~/share/espeak-data ./
@@ -496,4 +507,4 @@ export TSLIB_PLUGINDIR=/mnt/sdcard/navit/lib/ts
 EOF
 
 cd $OUT_PATH
-zip -r $CIRCLE_ARTIFACTS/navitom.zip navit SDKRegistry
+zip -r $CIRCLE_ARTIFACTS/navit-tomtom-plugin.zip navit SDKRegistry
