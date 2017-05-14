@@ -7,7 +7,8 @@
 set -e
 
 export ARCH=arm-linux
-cp Toolchain/$ARCH.cmake /tmp
+export TMP_DIR="/tmp/tomtom-plugin"
+cp Toolchain/$ARCH.cmake ${TMP_DIR}
 
 # toolchain
 export TOMTOM_SDK_DIR=/opt/tomtom-sdk
@@ -45,12 +46,12 @@ then
 fi
 
 # toolchain
-cd /tmp
+cd ${TMP_DIR}
 mkdir -p $TOMTOM_SDK_DIR
 tar xzf ~/tomtom_assets/toolchain_redhat_gcc-3.3.4_glibc-2.3.2-20060131a.tar.gz -C $TOMTOM_SDK_DIR
 
 # espeak
-cd /tmp
+cd ${TMP_DIR}
 # this one includes the precompiled voices
 wget -nv -c http://freefr.dl.sourceforge.net/project/espeak/espeak/espeak-1.48/espeak-1.48.04-source.zip
 unzip espeak-1.48.04-source.zip
@@ -65,8 +66,8 @@ cd src
 make install
 
 # http://forum.navit-project.org/viewtopic.php?f=17&t=568
-cd /tmp
-cat > /tmp/espeakdsp.c << EOF
+cd ${TMP_DIR}
+cat > ${TMP_DIR}/espeakdsp.c << EOF
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -176,7 +177,7 @@ EOF
 arm-linux-gcc -O2 -I$PREFIX/include -I$PREFIX/usr/include espeakdsp.c -o espeakdsp
 
 # zlib
-cd /tmp
+cd ${TMP_DIR}
 wget -nv -c http://zlib.net/zlib-1.2.11.tar.gz
 tar xzf zlib-1.2.11.tar.gz
 cd zlib-1.2.11
@@ -185,7 +186,7 @@ make -j$JOBS
 make install
 
 # libxml
-cd /tmp/
+cd ${TMP_DIR}/
 wget -nv -c http://xmlsoft.org/sources/libxml2-2.7.8.tar.gz
 tar xzf libxml2-2.7.8.tar.gz
 cd libxml2-2.7.8/
@@ -194,7 +195,7 @@ make -j$JOBS
 make install
 
 # libpng
-cd /tmp/
+cd ${TMP_DIR}/
 tar xzf ~/tomtom_assets/libpng-1.6.29.tar.gz
 cd libpng-1.6.29/ 
 ./configure --prefix=$PREFIX --host=$ARCH
@@ -202,7 +203,7 @@ make -j$JOBS
 make install
 
 
-cd /tmp
+cd ${TMP_DIR}
 wget -nv -c http://download.savannah.gnu.org/releases/freetype/freetype-2.5.0.tar.gz
 tar xzf freetype-2.5.0.tar.gz
 cd freetype-2.5.0
@@ -213,7 +214,7 @@ make install
 freetype-config --cflags
 
 # glib
-cd /tmp
+cd ${TMP_DIR}
 wget -nv -c http://ftp.gnome.org/pub/gnome/sources/glib/2.25/glib-2.25.17.tar.gz
 tar xzf glib-2.25.17.tar.gz
 cd glib-2.25.17
@@ -232,7 +233,7 @@ make install
 
 
 # tslib
-cd /tmp
+cd ${TMP_DIR}
 rm -rf tslib-svn
 git clone https://github.com/playya/tslib-svn.git
 cd tslib-svn
@@ -248,7 +249,7 @@ make -j$JOBS
 make install
 
 
-cd /tmp
+cd ${TMP_DIR}
 wget -nv -c http://www.libsdl.org/release/SDL-1.2.15.tar.gz
 tar xzf SDL-1.2.15.tar.gz
 cd SDL-1.2.15
@@ -272,7 +273,7 @@ cp testvidinfo $PREFIX/usr/bin/
 export PATH=$PREFIX/bin:$PATH
 
 # sdl image
-cd /tmp
+cd ${TMP_DIR}
 wget -nv -c http://www.libsdl.org/projects/SDL_image/release/SDL_image-1.2.12.tar.gz
 tar xzf SDL_image-1.2.12.tar.gz
 cd SDL_image-1.2.12
@@ -305,11 +306,11 @@ EOF
 
 # navit
 cd ~/navit
-sed -i "s|set ( TOMTOM_SDK_DIR /opt/tomtom-sdk )|set ( TOMTOM_SDK_DIR $TOMTOM_SDK_DIR )|g" /tmp/$ARCH.cmake
+sed -i "s|set ( TOMTOM_SDK_DIR /opt/tomtom-sdk )|set ( TOMTOM_SDK_DIR $TOMTOM_SDK_DIR )|g" ${TMP_DIR}/$ARCH.cmake
 mkdir -p build
 cd build
 cmake ../ -DCMAKE_INSTALL_PREFIX=$PREFIX -DFREETYPE_INCLUDE_DIRS=$PREFIX/include/freetype2/ -Dsupport/gettext_intl=TRUE \
--DHAVE_API_TOMTOM=TRUE -DXSLTS=tomtom -DAVOID_FLOAT=TRUE -Dmap/mg=FALSE -DUSE_PLUGINS=0 -DCMAKE_TOOLCHAIN_FILE=/tmp/$ARCH.cmake \
+-DHAVE_API_TOMTOM=TRUE -DXSLTS=tomtom -DAVOID_FLOAT=TRUE -Dmap/mg=FALSE -DUSE_PLUGINS=0 -DCMAKE_TOOLCHAIN_FILE=${TMP_DIR}/$ARCH.cmake \
 -DDISABLE_QT=ON -DSAMPLE_MAP=n -DBUILD_MAPTOOL=n
 make -j$JOBS
 make install
@@ -317,7 +318,7 @@ cd ..
 
 
 # creating directories
-OUT_PATH="/tmp/tomtom/sdcard"
+OUT_PATH="${TMP_DIR}/tomtom/sdcard"
 rm -rf $OUT_PATH
 mkdir -p $OUT_PATH
 cd $OUT_PATH
@@ -447,7 +448,7 @@ cp -r ~/share/espeak-data ./
 cp $PREFIX/bin/espeak $OUT_PATH/navit/bin/
 cp $PREFIX/lib/libespeak.so.1 $OUT_PATH/navit/lib
 
-mv /tmp/espeakdsp $OUT_PATH/navit/bin/
+mv ${TMP_DIR}/espeakdsp $OUT_PATH/navit/bin/
 
 # add a menu button
 cat > $OUT_PATH/SDKRegistry/navit.cap << EOF
