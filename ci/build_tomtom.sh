@@ -32,22 +32,22 @@ JOBS=`getconf _NPROCESSORS_ONLN`
 echo "Jobs"
 echo $JOBS
 
-mkdir -p ~/tomtom_assets
+mkdir -p ~/assets/tomtom
 
-if ! [ -e "~/tomtom_assets/toolchain_redhat_gcc-3.3.4_glibc-2.3.2-20060131a.tar.gz" ]
+if ! [ -e "~/assets/tomtom/toolchain_redhat_gcc-3.3.4_glibc-2.3.2-20060131a.tar.gz" ]
  then 
-  wget -nv -c https://github.com/navit-gps/dependencies/raw/master/tomtom/toolchain_redhat_gcc-3.3.4_glibc-2.3.2-20060131a.tar.gz -P ~/tomtom_assets
+  wget -nv -c https://github.com/navit-gps/dependencies/raw/master/tomtom/toolchain_redhat_gcc-3.3.4_glibc-2.3.2-20060131a.tar.gz -P ~/assets/tomtom
 fi
 
-if ! test -f "~/tomtom_assets/libpng-1.6.29.tar.gz"
+if ! test -f "~/assets/tomtom/libpng-1.6.29.tar.gz"
 then 
-  wget -nv -c ftp://ftp.simplesystems.org/pub/libpng/png/src/libpng16/libpng-1.6.29.tar.gz -P ~/tomtom_assets
+  wget -nv -c ftp://ftp.simplesystems.org/pub/libpng/png/src/libpng16/libpng-1.6.29.tar.gz -P ~/assets/tomtom
 fi
 
 # toolchain
 cd /tmp
 mkdir -p $TOMTOM_SDK_DIR
-tar xzf ~/tomtom_assets/toolchain_redhat_gcc-3.3.4_glibc-2.3.2-20060131a.tar.gz -C $TOMTOM_SDK_DIR
+tar xzf ~/assets/tomtom/toolchain_redhat_gcc-3.3.4_glibc-2.3.2-20060131a.tar.gz -C $TOMTOM_SDK_DIR
 
 # espeak
 cd /tmp
@@ -195,7 +195,7 @@ make install
 
 # libpng
 cd /tmp/
-tar xzf ~/tomtom_assets/libpng-1.6.29.tar.gz
+tar xzf ~/assets/tomtom/libpng-1.6.29.tar.gz
 cd libpng-1.6.29/ 
 ./configure --prefix=$PREFIX --host=$ARCH
 make -j$JOBS
