@@ -251,6 +251,8 @@ else()
    endif(NEEDS_LIBINTL)
 endif(NOT HAVE_LIBINTL)
 
+list(APPEND NAVIT_LIBS "-lssd1306")
+
 if (CMAKE_USE_PTHREADS_INIT)
    if (NOT ANDROID)
       list(APPEND NAVIT_LIBS pthread)
@@ -502,6 +504,7 @@ add_module(map/csv "Default" TRUE)
 #Modules without test yet
 add_module(plugin/pedestrian "Default" FALSE)
 add_module(plugin/j1850 "Default" FALSE)
+add_module(plugin/ssd1306 "Default" TRUE)
 add_module(speech/android "Default" FALSE)
 add_module(speech/espeak "Default" FALSE)
 add_module(speech/iphone "Default" FALSE)
