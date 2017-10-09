@@ -291,7 +291,7 @@ ssd1306_idle (gpointer data)	// (struct ssd1306 *ssd1306)
 	  	display.drawRect(60, display.height()-21, 6, 20, WHITE);
 	}
       display.display ();
-      g_timeout_add (10, ssd1306_idle, ssd1306);
+      // g_timeout_add (10, ssd1306_idle, ssd1306);
     }
 }
 
