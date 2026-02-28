@@ -4,6 +4,7 @@ project('navit', 'c', 'cpp', default_options: ['warning_level=3'])
 add_project_arguments(
 	'-fno-strict-aliasing',
 	'-fwrapv',
+	'-DHAVE_UNISTD_H=1',
 	language: ['c', 'cpp'])
 
 # Enable large files
@@ -68,15 +69,19 @@ sources = [
 # Navit
 libgps = dependency('libgps', required: false)
 arduipi = cc.find_library('ArduiPi_OLED', required: false)
-if libgps.found() and arduipi.found()
-	navitdepends = depends + [libgps, arduipi]
+if arduipi.found()
+	navitdepends = depends + [arduipi]
 	navitincludedirs = includedirs
 	navitsources = sources + [
 		'navit/graphics/ssd1306/graphics_init_animation.cpp',
 		'navit/graphics/ssd1306/graphics_ssd1306.cpp',
 		'navit/start.c',
-		'navit/vehicle/gpsd/vehicle_gpsd.c',
+		'navit/vehicle/file/vehicle_file.c',
 	]
+	if libgps.found()
+		navitdepends += [libgps]
+		navitsources += ['navit/vehicle/gpsd/vehicle_gpsd.c']
+	endif
 	executable('navit',
 		navitsources,
 		dependencies: navitdepends,
