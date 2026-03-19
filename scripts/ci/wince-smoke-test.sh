@@ -9,19 +9,18 @@
 # Environment:
 #   EMU_DIR        - emulator directory (default: emulator)
 #   NAVIT_DIR      - navit package directory (default: navit-package)
-#   SMOKE_TIMEOUT  - total timeout in seconds (default: 120)
+#   SMOKE_TIMEOUT  - total timeout in seconds (default: 180)
 
 set -euo pipefail
 
 EMU_DIR="${EMU_DIR:-emulator}"
 NAVIT_DIR="${NAVIT_DIR:-navit-package}"
 RESULTS_DIR="smoke-results"
-SMOKE_TIMEOUT="${SMOKE_TIMEOUT:-120}"
+SMOKE_TIMEOUT="${SMOKE_TIMEOUT:-180}"
 
 export WINEPREFIX="$PWD/.wine-emu"
 export WINEARCH=win32
 export WINEDEBUG="-all,+err"
-# Skip mono/gecko downloads — they hang in CI and aren't needed for Device Emulator
 export WINEDLLOVERRIDES="mscoree=d;mshtml=d"
 
 mkdir -p "$RESULTS_DIR"
@@ -35,30 +34,35 @@ capture_screenshot() {
         log "Screenshot: $outfile" || true
 }
 
-# Click at coordinates relative to the emulator window
+# Click inside the WM screen area of the emulator.
+# The emulator window starts at screen position (3, 29) with a 19px Wine menu bar.
+# The WM screen area starts at screen (3, 48) and is 240x320 pixels.
+# WM coordinates (0,0) = screen (3, 48).
 emu_click() {
-    local x="$1" y="$2"
-    local win_id
-    win_id="$(xdotool search --name 'Device Emulator' 2>/dev/null | head -1 || \
-              xdotool search --name 'Pocket PC' 2>/dev/null | head -1 || true)"
-    if [ -n "$win_id" ]; then
-        # Get window geometry to find the offset
-        local wx wy
-        eval "$(xdotool getwindowgeometry --shell "$win_id" 2>/dev/null || true)"
-        wx="${X:-0}"
-        wy="${Y:-0}"
-        # The WM screen starts below the Wine menu bar (~20px)
-        # Coordinates are relative to the WM screen area
-        local abs_x=$((wx + x))
-        local abs_y=$((wy + 20 + y))
-        log "Click at WM($x,$y) -> screen($abs_x,$abs_y)"
-        xdotool mousemove "$abs_x" "$abs_y"
-        sleep 0.2
-        xdotool click 1
-        sleep 1
-    else
-        log "WARNING: Could not find emulator window for click"
-    fi
+    local wmx="$1" wmy="$2"
+    local sx=$((3 + wmx))
+    local sy=$((48 + wmy))
+    log "Click WM($wmx,$wmy) -> screen($sx,$sy)"
+    xdotool mousemove "$sx" "$sy"
+    sleep 0.3
+    xdotool mousedown 1
+    sleep 0.1
+    xdotool mouseup 1
+    sleep 1
+}
+
+# Double-click inside the WM screen area
+emu_dblclick() {
+    local wmx="$1" wmy="$2"
+    local sx=$((3 + wmx))
+    local sy=$((48 + wmy))
+    log "DblClick WM($wmx,$wmy) -> screen($sx,$sy)"
+    xdotool mousemove "$sx" "$sy"
+    sleep 0.2
+    xdotool mousedown 1; sleep 0.05; xdotool mouseup 1
+    sleep 0.15
+    xdotool mousedown 1; sleep 0.05; xdotool mouseup 1
+    sleep 1
 }
 
 cleanup() {
@@ -94,12 +98,11 @@ timeout 10 wineserver --wait 2>/dev/null || true
 log "Wine initialized"
 
 # --- Convert paths to Windows format ---
-EMU_WIN="$(winepath -w "$(realpath "$EMU_DIR/DeviceEmulator.exe")")"
 ROM_WIN="$(winepath -w "$(realpath "$EMU_DIR/rom.bin")")"
 SHARE_WIN="$(winepath -w "$(realpath "$NAVIT_DIR")")"
 
 # --- Launch Device Emulator ---
-log "Launching: wine $EMU_WIN $ROM_WIN /memsize 128 /sharedfolder $SHARE_WIN"
+log "Launching Device Emulator..."
 
 wine "$EMU_DIR/DeviceEmulator.exe" \
     "$ROM_WIN" \
@@ -110,108 +113,114 @@ EMU_PID=$!
 log "Device Emulator PID: $EMU_PID"
 
 # --- Wait for emulator window ---
-BOOT_TIMEOUT=60
-log "Waiting up to ${BOOT_TIMEOUT}s for emulator window..."
+log "Waiting for emulator window..."
 START=$SECONDS
-BOOTED=false
 
-while [ $((SECONDS - START)) -lt "$BOOT_TIMEOUT" ]; do
+for i in $(seq 1 30); do
     if ! kill -0 "$EMU_PID" 2>/dev/null; then
         log "Device Emulator died during boot"
         tail -30 "$RESULTS_DIR/wine-output.log" | tee -a "$RESULTS_DIR/smoke-test.log"
         capture_screenshot "crash"
         exit 1
     fi
-
-    if xdotool search --name "Device Emulator" 2>/dev/null | grep -q . || \
-       xdotool search --name "Pocket PC" 2>/dev/null | grep -q .; then
-        BOOTED=true
+    if xdotool search --name "Device Emulator" 2>/dev/null | grep -q .; then
         log "Emulator window detected after $((SECONDS - START))s"
         break
     fi
-
     sleep 2
 done
-
-if ! $BOOTED; then
-    if kill -0 "$EMU_PID" 2>/dev/null; then
-        log "WARNING: No window detected but process alive — continuing"
-    else
-        log "FATAL: No window and process dead"
-        capture_screenshot "crash"
-        exit 1
-    fi
-fi
 
 # --- Let WM finish booting ---
 log "Waiting 20s for WM to stabilize..."
 sleep 20
-capture_screenshot "post-boot"
+capture_screenshot "01-post-boot"
 
 if ! kill -0 "$EMU_PID" 2>/dev/null; then
     log "Device Emulator died after boot"
-    tail -30 "$RESULTS_DIR/wine-output.log" | tee -a "$RESULTS_DIR/smoke-test.log"
     exit 1
 fi
 
-# --- Launch Navit via xdotool clicks ---
-# The WM 6.1 Professional emulator has a 240x320 screen.
-# We need to navigate: Start > File Explorer > Storage Card > navit.exe
+# --- Navigate the WM UI to launch Navit ---
+# WM 6.1 Professional screen layout (240x320):
+#   Title bar: y=0-20  ("Start" text at ~x=30, y=8)
+#   Today screen content: y=20-295
+#   Softkey bar: y=295-320 ("Calendar" left, "Contacts" right)
 #
-# Coordinate reference (relative to WM screen area, 240x320):
-#   Start button: top-left area (~30, 7)
-#   Start menu items vary by position
-#
-# Alternative approach: use the emulator's File menu to run a command,
-# or navigate via File Explorer.
-#
-# Strategy: Click Start > Programs > File Explorer, then navigate to
-# Storage Card and tap navit.exe. Coordinates are approximate and may
-# need tuning based on actual menu layout.
+# Navigation plan:
+#   1. Tap Start (top bar)
+#   2. Tap Programs in the Start menu
+#   3. Tap File Explorer in the Programs list
+#   4. Navigate to Storage Card
+#   5. Tap navit.exe
 
-log "Attempting to launch Navit inside emulator..."
+log "=== Launching Navit via UI navigation ==="
 
-# Step 1: Click "Start" in the WM taskbar (top-left of WM screen)
-log "Step 1: Clicking Start..."
-emu_click 30 7
+# Focus the emulator window first
+WIN_ID="$(xdotool search --name 'Device Emulator' 2>/dev/null | head -1 || true)"
+if [ -n "$WIN_ID" ]; then
+    xdotool windowactivate "$WIN_ID" 2>/dev/null || true
+    xdotool windowfocus "$WIN_ID" 2>/dev/null || true
+    sleep 0.5
+fi
+
+# Step 1: Tap "Start" in WM title bar
+log "Step 1: Tapping Start..."
+emu_click 30 8
+sleep 3
+capture_screenshot "02-start-tapped"
+
+# Step 2: Tap "Programs" — in WM6 Start menu, Programs is near the bottom
+# The start menu shows recent apps at top, then Programs at bottom
+log "Step 2: Tapping Programs..."
+emu_click 120 270
+sleep 3
+capture_screenshot "03-programs-tapped"
+
+# Step 3: Tap "File Explorer" — it's in the Programs grid/list
+# File Explorer is typically in the first row of programs
+log "Step 3: Tapping File Explorer..."
+emu_click 60 100
+sleep 3
+capture_screenshot "04-file-explorer-tapped"
+
+# If we didn't get File Explorer, try scrolling or another position
+# File Explorer might be at a different spot
+log "Step 3b: Trying alternate File Explorer position..."
+emu_click 180 100
+sleep 3
+capture_screenshot "05-file-explorer-alt"
+
+# Step 4: Look for "Storage Card" in File Explorer
+# In File Explorer, folders are listed vertically
+log "Step 4: Tapping Storage Card..."
+emu_click 120 60
 sleep 2
-capture_screenshot "start-menu"
+capture_screenshot "06-storage-card"
 
-# Step 2: Click "Programs" in the Start menu
-# In WM6.1 Professional, "Programs" is typically near the bottom of the Start menu
-log "Step 2: Clicking Programs..."
-emu_click 120 280
+# Try tapping on first item in the list
+emu_click 120 100
 sleep 2
-capture_screenshot "programs-menu"
+capture_screenshot "07-folder-item"
 
-# Step 3: Look for File Explorer in Programs
-# File Explorer is typically in the Programs list
-log "Step 3: Clicking File Explorer..."
-emu_click 120 120
-sleep 2
-capture_screenshot "file-explorer"
+# Step 5: Look for navit.exe — try double-clicking first item
+log "Step 5: Launching navit.exe..."
+emu_dblclick 120 60
+sleep 3
+capture_screenshot "08-navit-attempt1"
 
-# Step 4: In File Explorer, look for "Storage Card" (the shared folder)
-log "Step 4: Looking for Storage Card..."
-emu_click 120 80
-sleep 2
-capture_screenshot "storage-card"
+emu_dblclick 120 100
+sleep 3
+capture_screenshot "09-navit-attempt2"
 
-# Step 5: Look for navit.exe
-log "Step 5: Looking for navit.exe..."
-emu_click 120 80
-sleep 2
-capture_screenshot "navit-click"
-
-# Give Navit time to start
-log "Waiting 10s for Navit to initialize..."
-sleep 10
-capture_screenshot "navit-startup"
+# Give Navit time to start and render
+log "Waiting 15s for Navit to initialize..."
+sleep 15
+capture_screenshot "10-navit-running"
 
 # --- Monitor for remaining time ---
 REMAINING=$((SMOKE_TIMEOUT - (SECONDS - START)))
 if [ "$REMAINING" -gt 0 ]; then
-    log "Monitoring for ${REMAINING}s more..."
+    log "Monitoring for ${REMAINING}s..."
     LAST_SHOT=$SECONDS
 
     while [ $((SECONDS - START)) -lt "$SMOKE_TIMEOUT" ]; do
@@ -231,7 +240,7 @@ if [ "$REMAINING" -gt 0 ]; then
 fi
 
 # --- Final ---
-capture_screenshot "final"
+capture_screenshot "99-final"
 
 if kill -0 "$EMU_PID" 2>/dev/null; then
     log "PASS: Device Emulator survived ${SMOKE_TIMEOUT}s"
@@ -240,7 +249,6 @@ else
     exit 1
 fi
 
-# Collect any Navit logs from the shared folder
 find "$NAVIT_DIR" -name "*.log" -exec cp {} "$RESULTS_DIR/" \; 2>/dev/null || true
 ps aux > "$RESULTS_DIR/processes.txt" 2>/dev/null || true
 
