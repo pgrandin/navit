@@ -21,6 +21,8 @@ SMOKE_TIMEOUT="${SMOKE_TIMEOUT:-120}"
 export WINEPREFIX="$PWD/.wine-emu"
 export WINEARCH=win32
 export WINEDEBUG="-all,+err"
+# Skip mono/gecko downloads — they hang in CI and aren't needed for Device Emulator
+export WINEDLLOVERRIDES="mscoree=d;mshtml=d"
 
 mkdir -p "$RESULTS_DIR"
 
@@ -59,8 +61,12 @@ kill -0 "$XVFB_PID" 2>/dev/null || { log "FATAL: Xvfb failed to start"; exit 1; 
 
 # --- Initialize Wine ---
 log "Initializing Wine prefix..."
-wineboot --init 2>/dev/null
-wineserver --wait 2>/dev/null || true
+# Timeout wineboot — it can hang downloading mono/gecko even with WINEDLLOVERRIDES
+timeout 60 wineboot --init 2>/dev/null || {
+    log "WARNING: wineboot timed out or failed (exit $?) — continuing anyway"
+}
+timeout 10 wineserver --wait 2>/dev/null || true
+log "Wine initialized"
 
 # --- Convert paths to Windows format ---
 EMU_WIN="$(winepath -w "$(realpath "$EMU_DIR/DeviceEmulator.exe")")"
