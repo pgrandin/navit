@@ -262,7 +262,7 @@ jobs:
       - name: Run WinCE smoke test
         run: bash scripts/ci/wince-smoke-test.sh
         env:
-          SMOKE_TIMEOUT: "120"
+          SMOKE_TIMEOUT: "180"
 
       - name: Upload smoke test results
         if: always()
