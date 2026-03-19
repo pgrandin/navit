@@ -224,6 +224,54 @@ jobs:
       - name: Update Navit-Download-Center
         run: bash scripts/update_download_center.sh
 
+  smoke_test_wince:
+    runs-on: ubuntu-latest
+    needs: build_wince
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: WinCE Archive
+          path: navit-package
+
+      - name: Cache Device Emulator and ROM
+        id: cache-emu
+        uses: actions/cache@v4
+        with:
+          path: emulator
+          key: wince-emu-v1
+
+      - name: Download and extract Device Emulator + ROM
+        if: steps.cache-emu.outputs.cache-hit != 'true'
+        run: bash scripts/ci/wince-setup-emulator.sh emulator
+
+      - name: Install Wine and display tools
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo mkdir -pm755 /etc/apt/keyrings
+          sudo wget -O /etc/apt/keyrings/winehq-archive.key \
+            https://dl.winehq.org/wine-builds/winehq.key
+          sudo wget -NP /etc/apt/sources.list.d/ \
+            "https://dl.winehq.org/wine-builds/ubuntu/dists/$(lsb_release -cs)/winehq-$(lsb_release -cs).sources"
+          sudo apt-get update
+          sudo apt-get install -y --install-recommends winehq-stable || \
+            sudo apt-get install -y wine wine32 wine64
+          sudo apt-get install -y xvfb imagemagick xdotool
+
+      - name: Run WinCE smoke test
+        run: bash scripts/ci/wince-smoke-test.sh
+        env:
+          SMOKE_TIMEOUT: "120"
+
+      - name: Upload smoke test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: WinCE Smoke Test Results
+          path: smoke-results/
+          retention-days: 14
+
   build_tomtom_minimal:
     runs-on: ubuntu-latest
     needs: sanity_check
@@ -273,7 +321,7 @@ jobs:
             bash scripts/update_download_center.sh
   merge_trunk_in_master:
     runs-on: ubuntu-latest
-    needs: [build_android, build_fdroid, build_wince, build_tomtom_minimal, build_linux, build_tomtom_plugin, build_win32]
+    needs: [build_android, build_fdroid, build_wince, smoke_test_wince, build_tomtom_minimal, build_linux, build_tomtom_plugin, build_win32]
     if: github.ref == 'refs/heads/trunk'
     steps:
       - uses: actions/checkout@v6
