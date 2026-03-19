@@ -169,53 +169,100 @@ emu_click 30 8
 sleep 3
 capture_screenshot "02-start-tapped"
 
-# Step 2: Tap "Programs" — in WM6 Start menu, Programs is near the bottom
-# The start menu shows recent apps at top, then Programs at bottom
+# Step 2: Tap "Programs" in the Start menu
+# From screenshot analysis of the WM 6.1 Start menu layout:
+#   Today:            y~30
+#   Office Mobile:    y~50
+#   Calendar:         y~68
+#   Contacts:         y~86
+#   Internet Explorer:y~104
+#   Messaging:        y~122
+#   "Recent Programs":y~148
+#   Programs:         y~170
+#   Settings:         y~190
+#   Help:             y~208
 log "Step 2: Tapping Programs..."
-emu_click 120 270
+emu_click 50 170
 sleep 3
 capture_screenshot "03-programs-tapped"
 
-# Step 3: Tap "File Explorer" — it's in the Programs grid/list
-# File Explorer is typically in the first row of programs
-log "Step 3: Tapping File Explorer..."
-emu_click 60 100
-sleep 3
-capture_screenshot "04-file-explorer-tapped"
+# Step 3: In Programs view, find and tap File Explorer
+# Programs view shows icons in a grid. File Explorer is typically present.
+# The grid starts around y=35, icons are ~70px apart in rows
+# First try common positions in the Programs grid
+log "Step 3: Looking for File Explorer in Programs grid..."
+capture_screenshot "03b-programs-view"
 
-# If we didn't get File Explorer, try scrolling or another position
-# File Explorer might be at a different spot
-log "Step 3b: Trying alternate File Explorer position..."
-emu_click 180 100
-sleep 3
-capture_screenshot "05-file-explorer-alt"
+# Programs grid layout is typically 3 columns x N rows
+# Icons at approximately: col1=40, col2=120, col3=200, rows at y=50,110,170,230
+# File Explorer is usually in the first page. Try several positions.
+# We'll click each and check the result.
+emu_click 40 50
+sleep 2
+capture_screenshot "04a-programs-click1"
 
-# Step 4: Look for "Storage Card" in File Explorer
-# In File Explorer, folders are listed vertically
-log "Step 4: Tapping Storage Card..."
+# Check if we opened File Explorer or something else
+# If it's not File Explorer, go back and try next icon
+emu_click 120 50
+sleep 2
+capture_screenshot "04b-programs-click2"
+
+emu_click 200 50
+sleep 2
+capture_screenshot "04c-programs-click3"
+
+emu_click 40 110
+sleep 2
+capture_screenshot "04d-programs-click4"
+
+emu_click 120 110
+sleep 2
+capture_screenshot "04e-programs-click5"
+
+emu_click 200 110
+sleep 2
+capture_screenshot "04f-programs-click6"
+
+# Take a state screenshot
+capture_screenshot "05-after-grid-clicks"
+
+# If we've reached File Explorer, we should see a list of folders/files.
+# Look for "Storage Card" and tap it.
+# In File Explorer list view, items start around y=40 with ~20px spacing
+log "Step 4: Looking for Storage Card..."
+sleep 2
+
+# Try tapping items in the file list
+emu_click 120 40
+sleep 2
+capture_screenshot "06a-list-item1"
+
 emu_click 120 60
 sleep 2
-capture_screenshot "06-storage-card"
+capture_screenshot "06b-list-item2"
 
-# Try tapping on first item in the list
-emu_click 120 100
+emu_click 120 80
 sleep 2
-capture_screenshot "07-folder-item"
+capture_screenshot "06c-list-item3"
 
-# Step 5: Look for navit.exe — try double-clicking first item
-log "Step 5: Launching navit.exe..."
-emu_dblclick 120 60
-sleep 3
-capture_screenshot "08-navit-attempt1"
+# Step 5: If we're in a folder, look for navit.exe
+log "Step 5: Looking for navit.exe..."
+emu_click 120 40
+sleep 2
+capture_screenshot "07a-navit-try1"
 
-emu_dblclick 120 100
-sleep 3
-capture_screenshot "09-navit-attempt2"
+emu_click 120 60
+sleep 2
+capture_screenshot "07b-navit-try2"
+
+emu_click 120 80
+sleep 2
+capture_screenshot "07c-navit-try3"
 
 # Give Navit time to start and render
 log "Waiting 15s for Navit to initialize..."
 sleep 15
-capture_screenshot "10-navit-running"
+capture_screenshot "08-navit-running"
 
 # --- Monitor for remaining time ---
 REMAINING=$((SMOKE_TIMEOUT - (SECONDS - START)))
