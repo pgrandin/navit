@@ -20,87 +20,73 @@
 #include "gpx2navit_txt.h"
 
 void failToWriteAttrRep(int iShape, int col, char *file, int line);
-void showStats(g2sprop * prop);
-void wipePathAttr(pathattr * pattr);
+void showStats(g2sprop *prop);
+void wipePathAttr(pathattr *pattr);
 pathattr *createPathAttr(void);
-void wipeAttr(g2sattr * attr);
-void setColsDefault(g2scolumns * cols);
+void wipeAttr(g2sattr *attr);
+void setColsDefault(g2scolumns *cols);
 g2scolumns *createCols(void);
 g2sattr *createAttr(void);
 g2sprop *createProp(void);
-void closeProp(g2sprop * prop);
-//shphandles *createShps(void);
-//dbfhandles *createDbfs(void);
-parsedata *createParsedata(XML_Parser parser, g2sprop * prop);
-void closeParsedata(parsedata * pdata);
+void closeProp(g2sprop *prop);
+// shphandles *createShps(void);
+// dbfhandles *createDbfs(void);
+parsedata *createParsedata(XML_Parser parser, g2sprop *prop);
+void closeParsedata(parsedata *pdata);
 
 /**
  * message when fail to write attribute
  */
-void failToWriteAttrRep(int iShape, int col, char *file, int line)
-{
-    printf("Fail to write a attribute at %s:%i. shapeid:%i col:%i\n", file,
-	   line, iShape, col);
+void failToWriteAttrRep(int iShape, int col, char *file, int line) {
+    printf("Fail to write a attribute at %s:%i. shapeid:%i col:%i\n", file, line, iShape, col);
 }
 
 /**
  * shows short statistics
  */
-void showStats(g2sprop * prop)
-{
+void showStats(g2sprop *prop) {
     g2sstats *stats = prop->stats;
     double ratio;
     if (prop->needsStats) {
-	if (prop->parseTrk) {
-	    if (stats->trkunconverted != 0) {
-		ratio =
-		    (double) stats->trkunconverted / (stats->trkcount +
-						      stats->
-						      trkunconverted) *
-		    100;
-	    } else {
-		ratio = 0;
-	    }
-	    printf("Track Points:\n");
-	    printf("\ttrack count:\t%i\n", stats->trkcount);
-	    printf("\tpoint count:\t%i\n", stats->trkpoints);
-	    if (!prop->isFast) {
-		printf("\ttotal length:\t%f\n", stats->trklength);
-		printf("\tunconverted:\t%i(%5.2f%%)\n",
-		       stats->trkunconverted, ratio);
-	    }
-	}
-	if (prop->parseRte) {
-	    if (stats->rteunconverted != 0) {
-		ratio =
-		    (double) stats->rteunconverted / (stats->rtecount +
-						      stats->
-						      rteunconverted) *
-		    100;
-	    } else {
-		ratio = 0;
-	    }
-	    printf("Routes:\n");
-	    printf("\troute count:\t%i\n", stats->rtecount);
-	    printf("\tpoint count:\t%i\n", stats->rtepoints);
-	    if (!prop->isFast) {
-		printf("\ttotal length:\t%f\n", stats->rtelength);
-		printf("\tunconverted:\t%i(%5.2f%%)\n",
-		       stats->rteunconverted, ratio);
-	    }
-	}
-	if (prop->parseWpt) {
-	    printf("Waypoints:\n");
-	    printf("\tpoint count:\t%i\n", stats->wptpoints);
-	}
+        if (prop->parseTrk) {
+            if (stats->trkunconverted != 0) {
+                ratio = (double)stats->trkunconverted / (stats->trkcount + stats->trkunconverted) * 100;
+            } else {
+                ratio = 0;
+            }
+            printf("Track Points:\n");
+            printf("\ttrack count:\t%i\n", stats->trkcount);
+            printf("\tpoint count:\t%i\n", stats->trkpoints);
+            if (!prop->isFast) {
+                printf("\ttotal length:\t%f\n", stats->trklength);
+                printf("\tunconverted:\t%i(%5.2f%%)\n", stats->trkunconverted, ratio);
+            }
+        }
+        if (prop->parseRte) {
+            if (stats->rteunconverted != 0) {
+                ratio = (double)stats->rteunconverted / (stats->rtecount + stats->rteunconverted) * 100;
+            } else {
+                ratio = 0;
+            }
+            printf("Routes:\n");
+            printf("\troute count:\t%i\n", stats->rtecount);
+            printf("\tpoint count:\t%i\n", stats->rtepoints);
+            if (!prop->isFast) {
+                printf("\ttotal length:\t%f\n", stats->rtelength);
+                printf("\tunconverted:\t%i(%5.2f%%)\n", stats->rteunconverted, ratio);
+            }
+        }
+        if (prop->parseWpt) {
+            printf("Waypoints:\n");
+            printf("\tpoint count:\t%i\n", stats->wptpoints);
+        }
     }
 }
 
 /**
- * clears a path attribute structure 
+ * clears a path attribute structure
  */
-void wipePathAttr(pathattr * pattr)
-{
+void wipePathAttr(pathattr *pattr) {
     pattr->name[0] = '\0';
     pattr->cmt[0] = '\0';
     pattr->desc[0] = '\0';
@@ -111,26 +97,24 @@ void wipePathAttr(pathattr * pattr)
     pattr->length = 0;
     pattr->interval = 0;
     pattr->speed = 0;
-    //pattr->point = NULL;
+    // pattr->point = NULL;
     pattr->count = 0;
 }
 
 /**
- * creates a new path attribute 
+ * creates a new path attribute
  */
-pathattr *createPathAttr(void)
-{
+pathattr *createPathAttr(void) {
     pathattr *pattr;
-    pattr = (pathattr *) malloc(sizeof(pathattr));
+    pattr = (pathattr *)malloc(sizeof(pathattr));
     wipePathAttr(pattr);
     return pattr;
 }
 
 /**
- * clears a element attribute structure 
+ * clears a element attribute structure
  */
-void wipeAttr(g2sattr * attr)
-{
+void wipeAttr(g2sattr *attr) {
     attr->lon = 0;
     attr->lat = 0;
     attr->minlon = 0;
@@ -170,8 +154,7 @@ void wipeAttr(g2sattr * attr)
 /**
  * sets default values to a column properties.
  */
-void setColsDefault(g2scolumns * cols)
-{
+void setColsDefault(g2scolumns *cols) {
     cols->name = 1;
     cols->cmt = 1;
     cols->desc = 1;
@@ -201,10 +184,9 @@ void setColsDefault(g2scolumns * cols)
 /**
  * creates a column structure
  */
-g2scolumns *createCols(void)
-{
+g2scolumns *createCols(void) {
     g2scolumns *cols;
-    cols = (g2scolumns *) malloc(sizeof(g2scolumns));
+    cols = (g2scolumns *)malloc(sizeof(g2scolumns));
     setColsDefault(cols);
     return cols;
 }
@@ -212,10 +194,9 @@ g2scolumns *createCols(void)
 /**
  * creates a element attribute structure.
  */
-g2sattr *createAttr(void)
-{
+g2sattr *createAttr(void) {
     g2sattr *attr;
-    attr = (g2sattr *) malloc(sizeof(g2sattr));
+    attr = (g2sattr *)malloc(sizeof(g2sattr));
     wipeAttr(attr);
     return attr;
 }
@@ -223,8 +204,7 @@ g2sattr *createAttr(void)
 /**
  * creates a properties structure for gpx2shp
  */
-g2sprop *createProp(void)
-{
+g2sprop *createProp(void) {
     g2sprop *prop;
     g2sstats *stats;
     g2scolumns *cols;
@@ -266,8 +246,7 @@ g2sprop *createProp(void)
 /**
  * close and free a propertires structure
  */
-void closeProp(g2sprop * prop)
-{
+void closeProp(g2sprop *prop) {
     free(prop->stats);
     free(prop->sourcefile);
     free(prop->ellipsoid);
@@ -283,19 +262,19 @@ void closeProp(g2sprop * prop)
 /**
  * creates a shapehandles structure
  */
-//shphandles *createShps(void)
+// shphandles *createShps(void)
 //{
-//    shphandles *shps;
-//    shps = malloc(sizeof(shphandles));
-//    shps->trk = NULL;
-//    shps->wpt = NULL;
-//    shps->rte = NULL;
-//    shps->trk_edg = NULL;
-//    shps->rte_edg = NULL;
-//    shps->trk_pnt = NULL;
-//    shps->rte_pnt = NULL;
-//    return shps;
-//}
+//     shphandles *shps;
+//     shps = malloc(sizeof(shphandles));
+//     shps->trk = NULL;
+//     shps->wpt = NULL;
+//     shps->rte = NULL;
+//     shps->trk_edg = NULL;
+//     shps->rte_edg = NULL;
+//     shps->trk_pnt = NULL;
+//     shps->rte_pnt = NULL;
+//     return shps;
+// }
 
 /**
  * creates a dbfhandles structure
@@ -317,16 +296,15 @@ void closeProp(g2sprop * prop)
 /**
  * creates a parse structure
  */
-parsedata *createParsedata(XML_Parser parser, g2sprop * prop)
-{
-    parsedata *pdata = (parsedata *) malloc(sizeof(parsedata));
+parsedata *createParsedata(XML_Parser parser, g2sprop *prop) {
+    parsedata *pdata = (parsedata *)malloc(sizeof(parsedata));
     pdata->fp = NULL;
-    //shphandles *shps = createShps();
-    //dbfhandles *dbfs = createDbfs();
+    // shphandles *shps = createShps();
+    // dbfhandles *dbfs = createDbfs();
     pathattr *pattr = createPathAttr();
     g2sattr *attr = createAttr();
-    parent *p = (parent *) malloc(sizeof(parent));
-    parent *c = (parent *) malloc(sizeof(parent));
+    parent *p = (parent *)malloc(sizeof(parent));
+    parent *c = (parent *)malloc(sizeof(parent));
     p->name = NULL;
     p->parentptr = NULL;
     c->name = "root";
@@ -339,8 +317,8 @@ parsedata *createParsedata(XML_Parser parser, g2sprop * prop)
     pdata->parser = parser;
     pdata->parent = p;
     pdata->current = c;
-    //pdata->shps = shps;
-    //pdata->dbfs = dbfs;
+    // pdata->shps = shps;
+    // pdata->dbfs = dbfs;
     pdata->prop = prop;
     pdata->pattr = pattr;
     pdata->attr = attr;
@@ -350,10 +328,9 @@ parsedata *createParsedata(XML_Parser parser, g2sprop * prop)
 /*
  * close and free resoures
  */
-void closeParsedata(parsedata * pdata)
-{
-    //free(pdata->shps);
-    //free(pdata->dbfs);
+void closeParsedata(parsedata *pdata) {
+    // free(pdata->shps);
+    // free(pdata->dbfs);
     free(pdata->parent);
     free(pdata->current);
     free(pdata->databuf);

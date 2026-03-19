@@ -17,7 +17,11 @@
  * Boston, MA  02110-1301, USA.
  */
 
+#ifndef NAVIT_GUI_GTK_GUI_GTK_H
+#define NAVIT_GUI_GTK_GUI_GTK_H
+
 #include "coord.h"
+#include <gtk/gtk.h>
 
 struct menu_methods;
 struct datawindow_methods;
@@ -26,37 +30,39 @@ struct callback;
 struct statusbar_priv;
 
 struct gui_priv {
-	struct navit *nav;
-        GtkWidget *win;
-	GtkWidget *dialog_win;
-	GtkWidget *dialog_entry;
-	struct pcoord dialog_coord;
-        GtkWidget *vbox;
-	GtkWidget *menubar;
-	GtkActionGroup *base_group;
-	GtkActionGroup *debug_group;
-	GtkActionGroup *dyn_group;
-	GtkUIManager *ui_manager;
-	GSList *layout_group;
-	GSList *projection_group;
-	GSList *vehicle_group;
-	GList *dest_menuitems;
-	GList *bookmarks_menuitems;
-	GList *vehicle_menuitems;
-	GtkUIManager *menu_manager; // old
-        struct statusbar_priv *statusbar;
-	int menubar_enable;
-	int toolbar_enable;
-	int statusbar_enable;
-	int dyn_counter;
-	struct datawindow_priv *datawindow;
+    struct navit *nav;
+    GtkWidget *win;
+    GtkWidget *dialog_win;
+    GtkWidget *dialog_entry;
+    struct pcoord dialog_coord;
+    GtkWidget *vbox;
+    GtkWidget *menubar;
+    GtkActionGroup *base_group;
+    GtkActionGroup *debug_group;
+    GtkActionGroup *dyn_group;
+    GtkUIManager *ui_manager;
+    GSList *layout_group;
+    GSList *projection_group;
+    GSList *vehicle_group;
+    GList *dest_menuitems;
+    GList *bookmarks_menuitems;
+    GList *vehicle_menuitems;
+    GtkUIManager *menu_manager;  // old
+    struct statusbar_priv *statusbar;
+    int menubar_enable;
+    int toolbar_enable;
+    int statusbar_enable;
+    int dyn_counter;
+    struct datawindow_priv *datawindow;
 };
 
 void gui_gtk_ui_init(struct gui_priv *this);
 struct menu_priv *gui_gtk_menubar_new(struct gui_priv *gui, struct menu_methods *meth);
 struct statusbar_priv *gui_gtk_statusbar_new(struct gui_priv *gui);
 struct menu_priv *gui_gtk_popup_new(struct gui_priv *gui, struct menu_methods *meth);
-struct datawindow_priv *gui_gtk_datawindow_new(struct gui_priv *gui, const char *name, struct callback *click, struct callback *close, struct datawindow_methods *meth);
+struct datawindow_priv *gui_gtk_datawindow_new(struct gui_priv *gui, const char *name, struct callback *click,
+                                               struct callback *close, struct datawindow_methods *meth);
 void gui_gtk_datawindow_destroy(struct datawindow_priv *win);
 void gui_gtk_datawindow_set_button(struct datawindow_priv *this_, GtkWidget *btn);
 
+#endif /* NAVIT_GUI_GTK_GUI_GTK_H */

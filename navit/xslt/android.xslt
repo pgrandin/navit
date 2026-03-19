@@ -34,6 +34,7 @@
          <xsl:attribute name="icon_s"><xsl:value-of select="number($ICON_MEDIUM)"/></xsl:attribute>
          <xsl:attribute name="icon_l"><xsl:value-of select="number($ICON_BIG)"/></xsl:attribute>
          <xsl:attribute name="spacing"><xsl:value-of select="round(2*number($OSD_SIZE))"/></xsl:attribute>
+	 <xsl:attribute name="keyboard">false</xsl:attribute>
          <xsl:apply-templates/>
       </xsl:copy>
    </xsl:template>
@@ -44,11 +45,15 @@
 			&lt;img src=''gui_rules'' onclick=''navit.graphics.set_map_location();''>&lt;text>Set map location&lt;/text>&lt;/img>
 			&lt;img src=''gui_rules'' onclick=''navit.graphics.backup_restore_dialog();''>&lt;text>Backup / Restore&lt;/text>&lt;/img>')"/>
    </xsl:template>
+   <xsl:template match="/config/navit/traffic">
+      <traffic type="traff_android"/>
+   </xsl:template>
 
    <xsl:template match="/config/navit[1]">
       <xsl:copy>
          <xsl:copy-of select="@*"/>
          <xsl:attribute name="zoom">32</xsl:attribute>
+         <xsl:attribute name="autozoom_active">1</xsl:attribute>
          <xsl:attribute name="timeout">86400</xsl:attribute>
          <xsl:attribute name="drag_bitmap">1</xsl:attribute>
          <xsl:apply-templates/>
@@ -67,7 +72,7 @@
          <xsl:apply-templates/>
       </xsl:copy>
    </xsl:template>
-   <xsl:template match="/config/navit/layout/layer/itemgra/child::*">
+   <xsl:template match="/config/navit/layout/layer/itemgra/child::*|/config/navit/layer/itemgra/child::*|layout/layer/itemgra/child::*">
       <xsl:copy>
          <xsl:copy-of select="@*[not(name()='text_size') and not(name()='width') and not(name()='radius') and not(name()='w') and not(name()='h') and not(name()='x') and not(name()='y') and not(name()='dash')]"/>
          <xsl:if test="@text_size">
@@ -109,10 +114,10 @@
 	 </xsl:if>
       </xsl:copy>
    </xsl:template>
-   <xsl:template match="/config/navit/layout">
+   <xsl:template match="/config/navit/layout|/layout">
       <xsl:copy>
          <xsl:copy-of select="@*"/>
-         <xsl:if test="@name='Car-Android'">
+         <xsl:if test="@name='Car'">
 		<xsl:attribute name="active">1</xsl:attribute>
 	 </xsl:if>
          <xsl:if test="number($OSD_SIZE)>3">

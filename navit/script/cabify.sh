@@ -2,10 +2,9 @@
 
 function check_pocketcab()
 {
-	which pocketpc-cab &> /dev/null
-	if [ $? -ne 0 ]
+	if ! which gcab &> /dev/null
 	then
-		echo "You don't have pocketpc-cab installed or not in PATH"
+		echo "You don't have gcab installed or not in PATH"
 		exit
 	fi
 }
@@ -27,8 +26,8 @@ else
 fi
 [ "$2" != "" ] && SRCDIR="$2"
 [ "$3" != "" ] && BASEDIR="$3"
-if [ "$4" != "" ]; 
-then 
+if [ "$4" != "" ];
+then
 	NAVITXML="$4"
 else
 	NAVITXML=""
@@ -42,17 +41,17 @@ echo "PocketPc dir: $BASEDIR"
 
 echo -n > $CABLIST.$$
 
-for i in `ls $SRCDIR/locale/*/*/*.mo`
+for i in $SRCDIR/locale/*/*/*.mo
 do
-	bn="`basename "$i"`"
+  bn=$(basename "$i")
 	d=${i##$SRCDIR/}
 	echo "$i $BASEDIR/$d" >> $CABLIST.$$
 done
 
-for i in $SRCDIR/navit/xpm/*.xpm
+for i in $SRCDIR/navit/icons/*.xpm
 do
-	bn="`basename "$i"`"
-	echo "$i $BASEDIR/xpm/" >> $CABLIST.$$
+  bn=$(basename "$i")
+	echo "$i $BASEDIR/icons/" >> $CABLIST.$$
 done
 
 echo "$SRCDIR/navit/navit.exe $BASEDIR/" >> $CABLIST.$$
@@ -64,20 +63,20 @@ if [ "$MAPSDIR" != "" ]
 then
 for i in $MAPSDIR/*.bin
 do
-	bn="`basename "$i"`"
+    bn=$(basename "$i")
 	echo "$i $BASEDIR/maps/$bn" >> $CABLIST.$$
 done
 for i in $MAPSDIR/*.txt
 do
-	bn="`basename "$i"`"
+    bn=$(basename "$i")
 	echo "$i $BASEDIR/maps/$bn" >> $CABLIST.$$
 done
 for i in $MAPSDIR/*.img
 do
-	bn="`basename "$i"`"
+  bn=$(basename "$i")
 	echo "$i $BASEDIR/maps/$bn" >> $CABLIST.$$
 done
 fi
-pocketpc-cab -p "Navit Team" -a "Navit" $CABLIST.$$ $CABNAME
+gcab -c $CABNAME $(cat $CABLIST.$$)
 rm $CABLIST.$$
 

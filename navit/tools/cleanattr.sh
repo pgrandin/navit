@@ -1,7 +1,7 @@
 #!/bin/sh
 
-# This script scans the navit sources for attributes that 
-# remained in attr_def.h but are no longer used. 
+# This script scans the navit sources for attributes that
+# remained in attr_def.h but are no longer used.
 
 ATTRFILE=attr_def.h
 TMPDIR=/tmp
@@ -20,24 +20,23 @@ if [ -f $TMPFILE ] ; then
 		exit 1;
 fi
 
-touch $TMPFILE
-if [ $? -ne 0 ] ; then
+if ! touch $TMPFILE
+then
 		echo "Could not write to temporary file $TEMPFILE."
 		echo "Please make sure you have write access to the temporary directory."
 		exit 1;
 fi
 
 
-ATTRLIST=`grep 'ATTR(.*)' $ATTRFILE | sed 's#^ATTR(##' | sed 's#).*##'`
+ATTRLIST=$(grep 'ATTR(.*)' $ATTRFILE | sed 's#^ATTR(##' | sed 's#).*##')
 
 cp $ATTRFILE $TMPFILE
 
 for ATTRNAME in $ATTRLIST ; do
 		ATTR="attr_$ATTRNAME"
 
-		grep -rI $ATTR ./* > /dev/null
-
-		if [ $? -ne 0 ] ; then 				
+		if ! grep -rI $ATTR ./* > /dev/null
+		then
 				echo "Unused attribute: $ATTR"
 				grep -v "ATTR($ATTRNAME)" $TMPFILE > $TMPFILE2
 				mv $TMPFILE2 $TMPFILE

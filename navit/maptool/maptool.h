@@ -1,4 +1,4 @@
-/**
+/*
  * Navit, a modular navigation system.
  * Copyright (C) 2005-2011 Navit Team
  *
@@ -16,61 +16,63 @@
  * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA  02110-1301, USA.
  */
-#include "config.h"
-#include <glib.h>
-#include "coord.h"
-#include "item.h"
-#include "attr.h"
-#include "geom.h"
-#include "types.h"
-#ifdef HAVE_LIBCRYPTO
-#include <openssl/md5.h>
-#endif
 
-#define sq(x) ((double)(x)*(x))
+#ifndef __NAVIT_MAPTOOL_H_
+#define __NAVIT_MAPTOOL_H_
+
+#include "attr.h"
+#include "attr_type_def.h"
+#include "config.h"
+#include "coord.h"
+#include "geom.h"
+#include "item.h"
+#include "item_type_def.h"
+#include "types.h"
+#include <glib.h>
+
+#define sq(x) ((double)(x) * (x))
 
 #define BUFFER_SIZE 1280
 
 #define debug_tile(x) 0
 #define debug_itembin(x) 0
 
-#define RELATION_MEMBER_PRINT_FORMAT "%d:"LONGLONG_FMT":%s"
-#define RELATION_MEMBER_PARSE_FORMAT "%d:"LONGLONG_FMT":%n"
+#define RELATION_MEMBER_PRINT_FORMAT "%d:" LONGLONG_FMT ":%s"
+#define RELATION_MEMBER_PARSE_FORMAT "%d:" LONGLONG_FMT ":%n"
 
 struct tile_data {
-	char buffer[1024];
-	int tile_depth;
-	struct rect item_bbox;
-	struct rect tile_bbox;
+    char buffer[1024];
+    int tile_depth;
+    struct rect item_bbox;
+    struct rect tile_bbox;
 };
 
 struct tile_parameter {
-	int min;
-	int max;
-	int overlap;
-	enum attr_type attr_to_copy;
+    int min;
+    int max;
+    int overlap;
+    enum attr_type attr_to_copy;
 };
 
 struct tile_info {
-	int write;
-	int maxlen;
-	char *suffix;
-	GList **tiles_list;
-	FILE *tilesdir_out;
+    int write;
+    int maxlen;
+    char *suffix;
+    GList **tiles_list;
+    FILE *tilesdir_out;
 };
 
 extern struct tile_head {
-	int num_subtiles;
-	int total_size;
-	char *name;
-	char *zip_data;
-	int total_size_used;
-	int zipnum;
-	int process;
-	struct tile_head *next;
-	// char subtiles[0];
+    int num_subtiles;
+    int total_size;
+    char *name;
+    char *zip_data;
+    int total_size_used;
+    int zipnum;
+    int process;
+    struct tile_head *next;
+    // char subtiles[0];
 } *tile_head_root;
-
 
 /**
  * A map item (street, POI, border etc.) as it is stored in a Navit binfile.
@@ -78,17 +80,17 @@ extern struct tile_head {
  * actual data (coordinates and attributes) is stored in memory after
  * this struct as two arrays of type struct coord and struct attr_bin
  * respectively.
- * See also http://wiki.navit-project.org/index.php/Navit%27s_binary_map_driver .
+ * See also https://navit.readthedocs.io/en/latest/user/configuration/maps/binfile.html#content .
  * @see struct coord
  * @see struct attr_bin
  */
 struct item_bin {
-	/** Length of this item (not including this length field) in 32-bit ints. */
-	int len;
-	/** Item type. */
-	enum item_type type;
-	/** Length of the following coordinate array in 32-bit ints. */
-	int clen;
+    /** Length of this item (not including this length field) in 32-bit ints. */
+    int len;
+    /** Item type. */
+    enum item_type type;
+    /** Length of the following coordinate array in 32-bit ints. */
+    int clen;
 };
 
 /**
@@ -99,31 +101,29 @@ struct item_bin {
  * @see struct item_bin
  */
 struct attr_bin {
-	/** Length of this attribute (not including this length field) in 32-bit ints. */
-	int len;
-	/** Attribute type. */
-	enum attr_type type;
+    /** Length of this attribute (not including this length field) in 32-bit ints. */
+    int len;
+    /** Attribute type. */
+    enum attr_type type;
 };
 
-
 struct item_bin_sink_func {
-	int (*func)(struct item_bin_sink_func *func, struct item_bin *ib, struct tile_data *tile_data);
-	void *priv_data[8];
+    int (*func)(struct item_bin_sink_func *func, struct item_bin *ib, struct tile_data *tile_data);
+    void *priv_data[8];
 };
 
 struct item_bin_sink {
-	void *priv_data[8];
-	GList *sink_funcs;
+    void *priv_data[8];
+    GList *sink_funcs;
 };
 #define NODE_ID_BITS 56
 struct node_item {
-	struct coord c;
-	unsigned long long int nd_id:NODE_ID_BITS;
-	char ref_way;
+    struct coord c;
+    unsigned long long int nd_id : NODE_ID_BITS;
+    char ref_way;
 };
 
 struct zip_info;
-
 struct country_table;
 
 /**
@@ -135,24 +135,24 @@ typedef unsigned long long int osmid;
 
 /** Files needed for processing a relation. */
 struct files_relation_processing {
-	FILE *ways_in;
-	FILE *ways_out;
-	FILE *nodes_in;
-	FILE *nodes_out;
-	FILE *nodes2_in;
-	FILE *nodes2_out;
+    FILE *ways_in;
+    FILE *ways_out;
+    FILE *nodes_in;
+    FILE *nodes_out;
+    FILE *nodes2_in;
+    FILE *nodes2_out;
 };
 
 /* boundaries.c */
 
 struct boundary {
-	struct item_bin *ib;
-	struct country_table *country;
-	char *iso2;
-	GList *segments,*sorted_segments;
-	GList *children;
-	struct rect r;
-	osmid admin_centre;
+    struct item_bin *ib;
+    struct country_table *country;
+    char *iso2;
+    GList *segments, *sorted_segments;
+    GList *children;
+    struct rect r;
+    osmid admin_centre;
 };
 
 char *osm_tag_value(struct item_bin *ib, char *key);
@@ -169,18 +169,18 @@ void free_boundaries(GList *l);
 
 /** A buffer that can be grown as needed. */
 struct buffer {
-	/** Number of bytes to extend the buffer by when it must grow. */
-	int malloced_step;
-	/** Current allocated size (bytes). */
-	long long malloced;
-	/** Base address of this buffer. */
-	unsigned char *base;
-	/** Size of currently used part of the buffer. */
-	long long size;
+    /** Number of bytes to extend the buffer by when it must grow. */
+    int malloced_step;
+    /** Current allocated size (bytes). */
+    long long malloced;
+    /** Base address of this buffer. */
+    unsigned char *base;
+    /** Size of currently used part of the buffer. */
+    long long size;
 };
 
 void save_buffer(char *filename, struct buffer *b, long long offset);
-void load_buffer(char *filename, struct buffer *b, long long offset, long long size);
+int load_buffer(char *filename, struct buffer *b, long long offset, long long size);
 long long sizeof_buffer(char *filename);
 
 /* ch.c */
@@ -209,10 +209,11 @@ void item_bin_add_attr_data(struct item_bin *ib, enum attr_type type, void *data
 void item_bin_add_attr(struct item_bin *ib, struct attr *attr);
 void item_bin_add_attr_int(struct item_bin *ib, enum attr_type type, int val);
 void *item_bin_get_attr(struct item_bin *ib, enum attr_type type, void *last);
-struct attr_bin * item_bin_get_attr_bin(struct item_bin *ib, enum attr_type type, void *last);
-struct attr_bin * item_bin_get_attr_bin_last(struct item_bin *ib);
+struct attr_bin *item_bin_get_attr_bin(struct item_bin *ib, enum attr_type type, void *last);
+struct attr_bin *item_bin_get_attr_bin_last(struct item_bin *ib);
 void item_bin_add_attr_longlong(struct item_bin *ib, enum attr_type type, long long val);
 void item_bin_add_attr_string(struct item_bin *ib, enum attr_type type, char *str);
+void item_bin_add_hole(struct item_bin *ib, struct coord *coord, int ccount);
 void item_bin_add_attr_range(struct item_bin *ib, enum attr_type type, short min, short max);
 void item_bin_remove_attr(struct item_bin *ib, void *ptr);
 void item_bin_write(struct item_bin *ib, FILE *out);
@@ -234,12 +235,16 @@ struct item_bin *read_item_range(FILE *in, int *min, int *max);
 struct item_bin *init_item(enum item_type type);
 extern struct item_bin *tmp_item_bin;
 
+/* itembin_slicer.c */
+void itembin_nicer_slicer(struct tile_info *info, struct item_bin *ib, FILE *reference, char *buffer, int min);
+
 /* maptool.c */
 
 extern long long slice_size;
+extern int thread_count;
 extern int attr_debug_level;
 extern char *suffix;
-extern int ignore_unkown;
+extern int ignore_unknown;
 extern GHashTable *dedupe_ways_hash;
 extern int slices;
 extern struct buffer node_buffer;
@@ -253,7 +258,6 @@ void sig_alrm_end(void);
 
 /* misc.c */
 extern struct rect world_bbox;
-
 
 void bbox_extend(struct coord *c, struct rect *r);
 void bbox(struct coord *c, int count, struct rect *r);
@@ -270,26 +274,26 @@ void add_aux_tiles(char *name, struct zip_info *info);
 void cat(FILE *in, FILE *out);
 int item_order_by_type(enum item_type type);
 
-
 /* osm.c */
 struct maptool_osm {
-	FILE *boundaries;
-	FILE *turn_restrictions;
-	FILE *associated_streets;
-	FILE *house_number_interpolations;
-	FILE *nodes;
-	FILE *ways;
-	FILE *line2poi;
-	FILE *poly2poi;
-	FILE *towns;
+    FILE *boundaries;
+    FILE *multipolygons;
+    FILE *turn_restrictions;
+    FILE *associated_streets;
+    FILE *house_number_interpolations;
+    FILE *nodes;
+    FILE *ways;
+    FILE *line2poi;
+    FILE *poly2poi;
+    FILE *towns;
 };
 
 /** Type of a relation member. */
 enum relation_member_type {
-	UNUSED,
-	rel_member_node,
-	rel_member_way,
-	rel_member_relation,
+    UNUSED,
+    rel_member_node,
+    rel_member_way,
+    rel_member_relation,
 };
 
 void osm_warning(char *type, osmid id, int cont, char *fmt, ...);
@@ -308,6 +312,7 @@ void flush_nodes(int final);
 void sort_countries(int keep_tmpfiles);
 void process_associated_streets(FILE *in, struct files_relation_processing *files_relproc);
 void process_house_number_interpolations(FILE *in, struct files_relation_processing *files_relproc);
+void process_multipolygons(FILE *in, FILE *coords, FILE *ways, FILE *ways_index, FILE *out);
 void process_turn_restrictions(FILE *in, FILE *coords, FILE *ways, FILE *ways_index, FILE *out);
 void process_turn_restrictions_old(FILE *in, FILE *coords, FILE *ways, FILE *ways_index, FILE *out);
 void clear_node_item_buffer(void);
@@ -317,13 +322,14 @@ unsigned long long item_bin_get_nodeid(struct item_bin *ib);
 unsigned long long item_bin_get_wayid(struct item_bin *ib);
 unsigned long long item_bin_get_relationid(struct item_bin *ib);
 void process_way2poi(FILE *in, FILE *out, int type);
-int map_resolve_coords_and_split_at_intersections(FILE *in, FILE *out, FILE *out_index, FILE *out_graph, FILE *out_coastline, int final);
+int map_resolve_coords_and_split_at_intersections(FILE *in, FILE *out, FILE *out_index, FILE *out_graph,
+                                                  FILE *out_coastline, int final);
 void write_countrydir(struct zip_info *zip_info, int max_index_size);
 void osm_process_towns(FILE *in, FILE *boundaries, FILE *ways, char *suffix);
 void load_countries(void);
 void remove_countryfiles(void);
-struct country_table * country_from_iso2(char *iso);
-void osm_init(FILE*);
+struct country_table *country_from_iso2(char *iso);
+void osm_init(FILE *);
 
 /* osm_o5m.c */
 int map_collect_data_osm_o5m(FILE *in, struct maptool_osm *osm);
@@ -336,24 +342,27 @@ int map_collect_data_osm_protobuf(FILE *in, struct maptool_osm *osm);
 int osm_protobufdb_load(FILE *in, char *dir);
 
 /* osm_relations.c */
-struct relations * relations_new(void);
-struct relations_func *relations_func_new(void (*func)(void *func_priv, void *relation_priv, struct item_bin *member, void *member_priv), void *func_priv);
-void relations_add_relation_member_entry(struct relations *rel, struct relations_func *func, void *relation_priv, void *member_priv, enum relation_member_type type, osmid id);
+struct relations *relations_new(void);
+struct relations_func *relations_func_new(void (*func)(void *func_priv, void *relation_priv, struct item_bin *member,
+                                                       void *member_priv),
+                                          void *func_priv);
+void relations_add_relation_member_entry(struct relations *rel, struct relations_func *func, void *relation_priv,
+                                         void *member_priv, enum relation_member_type type, osmid id);
 void relations_add_relation_default_entry(struct relations *rel, struct relations_func *func);
 void relations_process(struct relations *rel, FILE *nodes, FILE *ways);
+void relations_process_multi(struct relations **rel, int count, FILE *nodes, FILE *ways);
 void relations_destroy(struct relations *rel);
-
 
 /* osm_xml.c */
 int osm_xml_get_attribute(char *xml, char *attribute, char *buffer, int buffer_size);
 void osm_xml_decode_entities(char *buffer);
 int map_collect_data_osm(FILE *in, struct maptool_osm *osm);
 
-
 /* sourcesink.c */
 
 struct item_bin_sink *item_bin_sink_new(void);
-struct item_bin_sink_func *item_bin_sink_func_new(int (*func)(struct item_bin_sink_func *func, struct item_bin *ib, struct tile_data *tile_data));
+struct item_bin_sink_func *item_bin_sink_func_new(int (*func)(struct item_bin_sink_func *func, struct item_bin *ib,
+                                                              struct tile_data *tile_data));
 void item_bin_sink_func_destroy(struct item_bin_sink_func *func);
 void item_bin_sink_add_func(struct item_bin_sink *sink, struct item_bin_sink_func *func);
 void item_bin_sink_destroy(struct item_bin_sink *sink);
@@ -372,14 +381,16 @@ char *tempfile_name(char *suffix, char *name);
 FILE *tempfile(char *suffix, char *name, int mode);
 void tempfile_unlink(char *suffix, char *name);
 void tempfile_rename(char *suffix, char *from, char *to);
+char *tempfile_obtain_prefix(void);
+void tempfile_cleanup(void);
 
 /* tile.c */
-extern GHashTable *tile_hash,*tile_hash2;
+extern GHashTable *tile_hash, *tile_hash2;
 
 struct aux_tile {
-	char *name;
-	char *filename;
-	int size;
+    char *name;
+    char *filename;
+    int size;
 };
 
 extern GList *aux_tile_list;
@@ -395,17 +406,15 @@ int write_aux_tiles(struct zip_info *zip_info);
 int create_tile_hash(void);
 void write_tilesdir(struct tile_info *info, struct zip_info *zip_info, FILE *out);
 void merge_tiles(struct tile_info *info);
-struct attr map_information_attrs[32];
+extern struct attr map_information_attrs[32];
 void index_init(struct zip_info *info, int version);
 void index_submap_add(struct tile_info *info, struct tile_head *th);
 
 /* zip.c */
 void write_zipmember(struct zip_info *zip_info, char *name, int filelen, char *data, int data_size);
-void zip_write_index(struct zip_info *info);
+int zip_write_index(struct zip_info *info);
 int zip_write_directory(struct zip_info *info);
 struct zip_info *zip_new(void);
-void zip_set_md5(struct zip_info *info, int on);
-int zip_get_md5(struct zip_info *info, unsigned char *out);
 void zip_set_zip64(struct zip_info *info, int on);
 void zip_set_compression_level(struct zip_info *info, int level);
 void zip_set_maxnamelen(struct zip_info *info, int max);
@@ -419,5 +428,17 @@ void zip_set_zipnum(struct zip_info *info, int num);
 void zip_close(struct zip_info *info);
 void zip_destroy(struct zip_info *info);
 
-/* Break compilation on 32 bit architectures, as we're going to cast osmid's to gpointer to use them as keys to GHashTable's */
-struct maptool_force_64 {char s[sizeof(gpointer)<sizeof(osmid)?-1:1];};
+/* osm.c */
+int process_multipolygons_find_loops(osmid relid, int in_count, struct item_bin **parts, int **scount, int ***sequences,
+                                     int **direction);
+int process_multipolygons_loop_dump(struct item_bin **bin, int scount, int *sequence, int *direction,
+                                    struct coord *buffer);
+int process_multipolygons_loop_count(struct item_bin **bin, int scount, int *sequence);
+
+/* Break compilation on 32 bit architectures, as we're going to cast osmid's to gpointer to use them as keys to
+ * GHashTable's */
+struct maptool_force_64 {
+    char s[sizeof(gpointer) < sizeof(osmid) ? -1 : 1];
+};
+
+#endif  // __NAVIT_MAPTOOL_H_

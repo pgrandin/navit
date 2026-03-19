@@ -17,52 +17,41 @@
  * Boston, MA  02110-1301, USA.
  */
 
-#include <glib.h>
+#include "announcement.h"
 #include "debug.h"
 #include "item.h"
-#include "announcement.h"
+#include <glib.h>
 
 struct announcement {
-	struct attr **attrs;
+    struct attr **attrs;
 };
 
-struct announcement *
-announcement_new(struct attr *parent, struct attr **attrs)
-{
-	struct announcement *this_;
-	struct attr *type_attr;
-	if (! (type_attr=attr_search(attrs, NULL, attr_name))) {
-		return NULL;
-	}
-	this_=g_new0(struct announcement, 1);
-	this_->attrs=attr_list_dup(attrs);
-	return this_;
+struct announcement *announcement_new(struct attr *parent, struct attr **attrs) {
+    struct announcement *this_;
+    struct attr *type_attr;
+    if (!(type_attr = attr_search(attrs, attr_name))) {
+        return NULL;
+    }
+    this_ = g_new0(struct announcement, 1);
+    this_->attrs = attr_list_dup(attrs);
+    return this_;
 }
 
-int
-announcement_get_attr(struct announcement *this_, enum attr_type type, struct attr *attr, struct attr_iter *iter)
-{
-	return attr_generic_get_attr(this_->attrs, NULL, type, attr, iter);
+int announcement_get_attr(struct announcement *this_, enum attr_type type, struct attr *attr, struct attr_iter *iter) {
+    return attr_generic_get_attr(this_->attrs, NULL, type, attr, iter);
 }
 
-int
-announcement_set_attr(struct announcement *this_, struct attr *attr)
-{
-	this_->attrs=attr_generic_set_attr(this_->attrs, attr);
-	return 1;
+int announcement_set_attr(struct announcement *this_, struct attr *attr) {
+    this_->attrs = attr_generic_set_attr(this_->attrs, attr);
+    return 1;
 }
 
-int
-announcement_add_attr(struct announcement *this_, struct attr *attr)
-{
-	this_->attrs=attr_generic_add_attr(this_->attrs, attr);
-	return 1;
+int announcement_add_attr(struct announcement *this_, struct attr *attr) {
+    this_->attrs = attr_generic_add_attr(this_->attrs, attr);
+    return 1;
 }
 
-int
-announcement_remove_attr(struct announcement *this_, struct attr *attr)
-{
-	this_->attrs=attr_generic_remove_attr(this_->attrs, attr);
-	return 1;
+int announcement_remove_attr(struct announcement *this_, struct attr *attr) {
+    this_->attrs = attr_generic_remove_attr(this_->attrs, attr);
+    return 1;
 }
-

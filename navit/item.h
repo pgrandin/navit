@@ -24,22 +24,14 @@
 extern "C" {
 #endif
 
+#include "item_type_def.h"
 #include <stdio.h>
-
-enum item_type {
-#define ITEM2(x,y) type_##y=x,
-#define ITEM(x) type_##x,
-#include "item_def.h"
-#undef ITEM2
-#undef ITEM
-};
 
 #define route_item_first type_street_0
 #define route_item_last type_street_parking_lane
 extern int default_flags[];
 
 #include "attr.h"
-
 
 /* NOTE: we treat districts as towns for now, since
    a) navit does not implement district search yet
@@ -51,64 +43,101 @@ extern int default_flags[];
 #define item_is_town(item) ((item).type >= type_town_label && (item).type <= type_district_label_1e7)
 #define item_is_district(item) ((item).type >= type_district_label && (item).type <= type_district_label_1e7)
 #define item_is_poly_place(item) ((item).type >= type_poly_place1 && (item).type <= type_poly_place6)
-#define item_is_point(item) ((item).type < type_line) 
+#define item_is_point(item) ((item).type < type_line)
 #define item_is_custom_poi(item) ((item).type >= type_poi_customg && (item).type < type_line)
-#define item_is_street(item) (((item).type >= type_street_nopass && (item).type <= type_roundabout) \
-                               ||  (item).type == type_street_service \
-                               || ((item).type >= type_street_pedestrian && (item).type <= type_track_grass) \
-                               ||  (item).type == type_living_street  \
-                               ||  (item).type == type_street_construction  \
-                               ||  (item).type == type_path \
-                               ||  (item).type == type_street_parking_lane \
-                               ||  (item).type == type_footway )
+#define item_is_street(item)                                                                                           \
+    (((item).type >= type_street_nopass && (item).type <= type_roundabout)                                             \
+     || ((item).type >= type_street_pedestrian && (item).type <= type_track_grass)                                     \
+     || (item).type == type_street_service || (item).type == type_living_street                                        \
+     || (item).type == type_street_construction || (item).type == type_path || (item).type == type_street_parking_lane \
+     || (item).type == type_footway)
+/**
+ * @brief Determines if the given item's type is a POI or not
+ *
+ * @param item The struct item
+ * @return Returns true if the item is a POI type otherwise returns false
+ */
+#define item_is_poi(item)                                                                                              \
+    (((item).type >= type_poi_lake && (item).type <= type_poi)                                                         \
+     || ((item).type >= type_poi_land_feature && (item).type <= type_poi_zoo)                                          \
+     || ((item).type >= type_poi_gc_multi && (item).type <= type_poi_cafe)                                             \
+     || ((item).type >= type_poi_peak && (item).type <= type_poi_image)                                                \
+     || ((item).type >= type_poi_townhall && (item).type <= type_poi_ruins)                                            \
+     || ((item).type >= type_poi_post_box && (item).type <= type_poi_tennis)                                           \
+     || ((item).type >= type_poi_vending_machine && (item).type <= type_poi_shop_shoes)                                \
+     || ((item).type >= type_poi_tree && (item).type <= type_poi_shop_photo)                                           \
+     || ((item).type >= type_poi_pub && (item).type <= type_poi_bahai)                                                 \
+     || ((item).type >= type_poi_customh && (item).type <= type_poi_customf))
 
-#define item_is_equal_id(a,b) ((a).id_hi == (b).id_hi && (a).id_lo == (b).id_lo)
-#define item_is_equal(a,b) (item_is_equal_id(a,b) && (a).map == (b).map)
+#define item_is_equal_id(a, b) ((a).id_hi == (b).id_hi && (a).id_lo == (b).id_lo)
+#define item_is_equal(a, b) (item_is_equal_id(a, b) && (a).map == (b).map)
 
 struct coord;
 
 enum change_mode {
-	change_mode_delete,
-	change_mode_modify,
-	change_mode_append,
-	change_mode_prepend,
+    change_mode_delete,
+    change_mode_modify,
+    change_mode_append,
+    change_mode_prepend,
 };
 
 struct item_methods {
-	void (*item_coord_rewind)(void *priv_data);
-	int (*item_coord_get)(void *priv_data, struct coord *c, int count);
-	void (*item_attr_rewind)(void *priv_data);
-	int (*item_attr_get)(void *priv_data, enum attr_type attr_type, struct attr *attr);
-	int (*item_coord_is_node)(void *priv_data);
-	int (*item_attr_set)(void *priv_data, struct attr *attr, enum change_mode mode);
-	int (*item_coord_set)(void *priv_data, struct coord *c, int count, enum change_mode mode);
-	int (*item_type_set)(void *priv_data, enum item_type type);
+    void (*item_coord_rewind)(void *priv_data);
+    int (*item_coord_get)(void *priv_data, struct coord *c, int count);
+    void (*item_attr_rewind)(void *priv_data);
+    int (*item_attr_get)(void *priv_data, enum attr_type attr_type, struct attr *attr);
+    int (*item_coord_is_node)(void *priv_data);
+    int (*item_attr_set)(void *priv_data, struct attr *attr, enum change_mode mode);
+    int (*item_coord_set)(void *priv_data, struct coord *c, int count, enum change_mode mode);
+    int (*item_type_set)(void *priv_data, enum item_type type);
+    int (*item_coords_left)(void *priv_data);
 };
 
 struct item_id {
-	int id_hi;
-	int id_lo;
+    int id_hi;
+    int id_lo;
 };
 
 #define ITEM_ID_FMT "(0x%x,0x%x)"
-#define ITEM_ID_ARGS(x) (x).id_hi,(x).id_lo
+#define ITEM_ID_ARGS(x) (x).id_hi, (x).id_lo
 
 /**
- * Represents an object on a map, such as a POI, a building, a way or a boundary.
+ * @brief Represents an object on a map.
+ *
+ * An item holds the data for an individual item on a map, including its coordinates and various attributes. The item
+ * type specifies what the map item refers to, such as a POI, a building, a way or a boundary. There are also special
+ * item types used internally, such as the various kinds of turn instructions. Item types are internally represented as
+ * numbers.
+ *
+ * Outside map implementations, items are generally retrieved from map rectangles, and their methods are implemented by
+ * the respective map driver. Items retrieved from a map rectangle are generally short-lived: a previously retrieved
+ * item should be considered invalid when a new item is retrieved from the same map rectangle, or after its map
+ * rectangle has been destroyed. After that, functions may segfault or return invalid data, and even the item itself
+ * may have been deallocated.
+ *
+ * Actual behavior may differ between map implementations, but do not rely on any behavior not covered by the above
+ * interface contract. Exceptions apply, of course, for code that is limited to working with items from one particular
+ * map (typically inside a map implementation).
  */
 struct item {
-	enum item_type type; /**< Type of the item.*/
-	int id_hi;  /**< First part of the ID of the item (item IDs have two parts).*/
-	int id_lo; /**< Second part of the ID of the item.*/
-	struct map *map; /**< The map this items belongs to.*/
-	struct item_methods *meth; /**< Methods to manipulate this item.*/
-	void *priv_data; /**< Private item data, only used by the map plugin which supplied this item.*/
+    enum item_type type;       /**< Type of the item.*/
+    int id_hi;                 /**< First part of the ID of the item (item IDs have two parts).*/
+    int id_lo;                 /**< Second part of the ID of the item.*/
+    struct map *map;           /**< The map this items belongs to.*/
+    struct item_methods *meth; /**< Methods to manipulate this item.*/
+    void *priv_data;           /**< Private item data, only used by the map plugin which supplied this item.*/
 };
 
 extern struct item_range {
-	enum item_type min,max;
+    enum item_type min, max;
 } item_range_all;
 
+/**
+ * @brief An item indicating that the map driver is busy fetching more items.
+ *
+ * This is a “magic” item which may be returned by one of the query methods of a map driver. Receiving this item means
+ * that the map driver is currently busy fetching more items, and they can be retrieved at a later point in time.
+ */
 extern struct item busy_item;
 
 /* prototypes */
@@ -127,9 +156,11 @@ void item_create_hash(void);
 void item_destroy_hash(void);
 int *item_get_default_flags(enum item_type type);
 void item_coord_rewind(struct item *it);
+int item_coords_left(struct item *it);
 int item_coord_get(struct item *it, struct coord *c, int count);
 int item_coord_set(struct item *it, struct coord *c, int count, enum change_mode mode);
 int item_coord_get_within_selection(struct item *it, struct coord *c, int count, struct map_selection *sel);
+int item_coord_get_within_range(struct item *i, struct coord *c, int max, struct coord *start, struct coord *end);
 int item_coord_get_pro(struct item *it, struct coord *c, int count, enum projection to);
 int item_coord_is_node(struct item *it);
 void item_attr_rewind(struct item *it);
@@ -154,7 +185,6 @@ void item_dump_filedesc(struct item *item, struct map *map, FILE *out);
 void item_cleanup(void);
 
 /* end of prototypes */
-
 
 #ifdef __cplusplus
 }

@@ -25,38 +25,40 @@ extern "C" {
 #endif
 
 #ifndef PATH_MAX
-#define PATH_MAX 4096
+#    define PATH_MAX 4096
 #endif
 #ifndef __CEGCC__
-#include <time.h>
+#    include <time.h>
 #endif
 #include "param.h"
 #include <stdio.h>
 
+#include "glib.h"
+
 struct file {
-	struct file *next;
-	unsigned char *begin;
-	unsigned char *end;
-	unsigned char *mmap_end;
-	long long size;
-	int name_id;
-	int fd;
+    struct file *next;
+    unsigned char *begin;
+    unsigned char *end;
+    unsigned char *mmap_end;
+    long long size;
+    int name_id;
+    int fd;
 #ifndef __CEGCC__
-	time_t mtime;
-	time_t ctime;
-	int version;			
+    time_t mtime;
+    time_t ctime;
+    int version;
 #endif
 #if defined(_WIN32) || defined(__CEGCC__)
-	long map_handle;
-	long map_file;
+    long map_handle;
+    long map_file;
 #endif
-	char *name;
-	int special;
-	int cache;
-	int requests;
-	unsigned char *buffer;
-	int buffer_len;
-	GHashTable *headers;
+    char *name;
+    int special;
+    int cache;
+    int requests;
+    unsigned char *buffer;
+    int buffer_len;
+    GHashTable *headers;
 };
 
 struct attr;
@@ -65,7 +67,8 @@ struct attr;
 int file_request(struct file *f, struct attr **options);
 char *file_http_header(struct file *f, char *header);
 struct file *file_create(char *name, struct attr **options);
-int file_is_dir(char *name);
+int file_is_dir(const char *name);
+int file_is_reg(const char *name);
 long long file_size(struct file *file);
 int file_mkdir(char *name, int pflag);
 int file_mmap(struct file *file);
@@ -76,7 +79,6 @@ void file_data_flush(struct file *file, long long offset, int size);
 int file_data_write(struct file *file, long long offset, int size, const void *data);
 int file_get_contents(char *name, unsigned char **buffer, int *size);
 unsigned char *file_data_read_compressed(struct file *file, long long offset, int size, int size_uncomp);
-unsigned char *file_data_read_encrypted(struct file *file, long long offset, int size, int size_uncomp, int compressed, char *passwd);
 void file_data_free(struct file *file, unsigned char *data);
 int file_exists(char const *name);
 void file_remap_readonly(struct file *f);
@@ -96,7 +98,6 @@ int file_version(struct file *file, int byname);
 void *file_get_os_handle(struct file *file);
 int file_set_cache_size(int cache_size);
 void file_init(void);
-int file_is_reg(char *name);
 void file_data_remove(struct file *file, unsigned char *data);
 /* end of prototypes */
 
