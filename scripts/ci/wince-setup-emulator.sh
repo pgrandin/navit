@@ -40,7 +40,7 @@ download_device_emulator() {
     fi
     log "Downloading Microsoft Device Emulator 3.0 (32-bit)..."
     curl -fSL --retry 3 -o vs_emulator.exe \
-        "https://archive.org/download/microsoft_emulators/vs_emulator.exe"
+        "https://archive.org/download/microsoft_emulators/Microsoft%20Device%20Emulator%203.0%2032-bit/Microsoft_Device_Emulator_V3.exe"
     log "Downloaded vs_emulator.exe ($(du -h vs_emulator.exe | cut -f1))"
 }
 
@@ -167,7 +167,7 @@ download_wm_images() {
     if [ ! -f "wm_images_raw" ]; then
         # The archive.org item may be an MSI or an EXE installer
         curl -fSL --retry 3 -o wm_images_raw \
-            "https://archive.org/download/WM614Emulator/Windows%20Mobile%206.1.4%20Emulator%20Images%20-%20ENU.msi" 2>/dev/null || \
+            "https://archive.org/download/WM614Emulator/Windows%20Mobile%206.1.4%20Professional%20Images%20%28USA%29.msi" 2>/dev/null || \
         curl -fSL --retry 3 -o wm_images_raw \
             "https://archive.org/download/windows-mobile-emulation-images-archive.-7z/Windows%20Mobile%20Emulation%20Images%20Archive.7z" 2>/dev/null || {
             log "ERROR: Could not download WM emulator images"
