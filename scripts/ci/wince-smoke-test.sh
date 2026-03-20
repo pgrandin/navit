@@ -10,6 +10,8 @@
 #   EMU_DIR        - emulator directory (default: emulator)
 #   NAVIT_DIR      - navit package directory (default: navit-package)
 #   SMOKE_TIMEOUT  - total timeout in seconds (default: 180)
+#   ROTATE         - emulator rotation: 0=portrait (default), 1=landscape-right,
+#                    2=upside-down, 3=landscape-left
 
 set -euo pipefail
 
@@ -17,6 +19,7 @@ EMU_DIR="${EMU_DIR:-emulator}"
 NAVIT_DIR="${NAVIT_DIR:-navit-package}"
 RESULTS_DIR="smoke-results"
 SMOKE_TIMEOUT="${SMOKE_TIMEOUT:-180}"
+ROTATE="${ROTATE:-0}"
 
 export WINEPREFIX="$PWD/.wine-emu"
 export WINEARCH=win32
@@ -89,8 +92,14 @@ log "rom.bin: $(du -h "$EMU_DIR/rom.bin" | cut -f1)"
 log "Navit package: $(find "$NAVIT_DIR" -type f | wc -l) files"
 
 # --- Start Xvfb ---
-log "Starting Xvfb..."
-Xvfb :99 -screen 0 320x480x24 &
+log "Starting Xvfb (rotate=$ROTATE)..."
+if [ "$ROTATE" = "1" ] || [ "$ROTATE" = "3" ]; then
+    # Landscape: WM screen 320x240 + Wine chrome
+    Xvfb :99 -screen 0 480x360x24 &
+else
+    # Portrait: WM screen 240x320 + Wine chrome
+    Xvfb :99 -screen 0 320x480x24 &
+fi
 XVFB_PID=$!
 export DISPLAY=:99
 sleep 2
@@ -111,10 +120,13 @@ SHARE_WIN="$(winepath -w "$(realpath "$NAVIT_DIR")")"
 # --- Launch Device Emulator ---
 log "Launching Device Emulator..."
 
+EMU_ARGS=("$ROM_WIN" /memsize 128 /sharedfolder "$SHARE_WIN")
+if [ "$ROTATE" != "0" ]; then
+    EMU_ARGS+=(/rotate "$ROTATE")
+fi
+
 wine "$EMU_DIR/DeviceEmulator.exe" \
-    "$ROM_WIN" \
-    /memsize 128 \
-    /sharedfolder "$SHARE_WIN" \
+    "${EMU_ARGS[@]}" \
     > "$RESULTS_DIR/wine-output.log" 2>&1 &
 EMU_PID=$!
 log "Device Emulator PID: $EMU_PID"
@@ -148,11 +160,6 @@ if ! kill -0 "$EMU_PID" 2>/dev/null; then
 fi
 
 # --- Navigate the WM UI to launch Navit ---
-# WM 6.1 Professional screen layout (240x320):
-#   Title bar: y=0-20  ("Start" text at ~x=30, y=8)
-#   Today screen content: y=20-295
-#   Softkey bar: y=295-320 ("Calendar" left, "Contacts" right)
-#
 # Navigation plan:
 #   1. Tap Start (top bar)
 #   2. Tap Programs in the Start menu
@@ -170,100 +177,137 @@ if [ -n "$WIN_ID" ]; then
     sleep 0.5
 fi
 
-# Step 1: Tap "Start" in WM title bar
-log "Step 1: Tapping Start..."
-emu_click 30 8
-sleep 3
-capture_screenshot "02-start-tapped"
+if [ "$ROTATE" = "1" ] || [ "$ROTATE" = "3" ]; then
+    # --- LANDSCAPE MODE (320x240) ---
+    # WM screen is 320w x 240h. Title bar at top, softkeys at bottom.
+    # Start button at top-left. Coordinates are estimated for first run.
 
-# Step 2: Tap "Programs" in the Start menu
-# From screenshot analysis of the WM 6.1 Start menu layout:
-#   Today:            y~30
-#   Office Mobile:    y~50
-#   Calendar:         y~68
-#   Contacts:         y~86
-#   Internet Explorer:y~104
-#   Messaging:        y~122
-#   "Recent Programs":y~148
-#   Programs:         y~170
-#   Settings:         y~190
-#   Help:             y~208
-log "Step 2: Tapping Programs..."
-emu_click 50 170
-sleep 3
-capture_screenshot "03-programs-tapped"
+    # Step 1: Tap "Start"
+    log "Step 1: Tapping Start..."
+    emu_click 30 8
+    sleep 3
+    capture_screenshot "02-start-tapped"
 
-# Step 3: Double-tap File Explorer in the Programs grid
-# From screenshot analysis of the Programs screen:
-#   Grid layout (3 columns x 4 rows):
-#     Row 1 (icon y~65, label y~85): Games(x~40), ActiveSync(x~120), Calculator(x~190)
-#     Row 2 (icon y~140, label y~162): File Explorer(x~40), Getting Started(x~120), Internet Sharing(x~190)
-#     Row 3 (icon y~210): Messenger(x~40), Notes(x~120), Pictures & Videos(x~190)
-#     Row 4 (icon y~280): Search(x~40), SimTkUI(x~120), Task Manager(x~190)
-# Single tap selects, double-tap opens.
-log "Step 3: Double-tapping File Explorer icon..."
-emu_dblclick 40 145
-sleep 3
-capture_screenshot "04-after-file-explorer-dblclick"
+    # Step 2: Tap "Programs" — menu is taller than screen, Programs near bottom
+    # In landscape the start menu shows fewer items before scrolling.
+    # Items are same height (~18px) but menu may need scrolling.
+    log "Step 2: Tapping Programs..."
+    emu_click 50 170
+    sleep 3
+    capture_screenshot "03-programs-tapped"
 
-# Check if we got File Explorer or are still on Programs
-# If still on Programs, try clicking the File Explorer text label
-log "Step 3b: Trying File Explorer label area..."
-emu_dblclick 40 165
-sleep 3
-capture_screenshot "05-after-label-dblclick"
+    # Step 3: Double-tap File Explorer in Programs grid
+    # Landscape grid may have more columns or same layout shifted.
+    # File Explorer: Row 2, Col 1 — estimate same relative position.
+    log "Step 3: Double-tapping File Explorer icon..."
+    emu_dblclick 40 145
+    sleep 3
+    capture_screenshot "04-after-file-explorer-dblclick"
 
-# Step 4: Navigate up to root, then to Storage Card
-# File Explorer opened in "Templates" folder. Need to go up to My Device root.
-# Bottom softkey bar: "Up" at bottom-left ~WM(40, 307), "Menu" at bottom-right ~WM(200, 307)
-log "Step 4: Navigating up to root..."
+    log "Step 3b: Trying File Explorer label area..."
+    emu_dblclick 40 165
+    sleep 3
+    capture_screenshot "05-after-label-dblclick"
 
-# Tap "Up" to go from Templates -> My Documents
-emu_click 40 307
-sleep 2
-capture_screenshot "06a-up1"
+    # Step 4: Navigate up to root
+    # Softkey bar: "Up" at bottom-left ~WM(40, 227)
+    log "Step 4: Navigating up to root..."
+    emu_click 40 227
+    sleep 2
+    capture_screenshot "06a-up1"
 
-# Tap "Up" again to go from My Documents -> My Device (root)
-emu_click 40 307
-sleep 2
-capture_screenshot "06b-up2"
+    emu_click 40 227
+    sleep 2
+    capture_screenshot "06b-up2"
 
-# Now we should be at \My Device root.
-# From screenshot analysis of root listing (06c):
-#   List items are ~18px tall, starting at WM y≈57:
-#   Application D...  y≈57
-#   ConnMgr           y≈75
-#   Documents a...    y≈93
-#   MUSIC             y≈111
-#   My Documents      y≈129
-#   Program Files     y≈147
-#   Storage Card      y≈165
-#   Temp              y≈183
-#   Windows           y≈201
-log "Step 4b: Looking for Storage Card in root..."
-capture_screenshot "06c-root-view"
+    # Root listing — same item order, same ~18px row height
+    # In landscape the list area starts at ~y=37 (shorter title/address bar)
+    # Storage Card is 7th item: y ≈ 37 + 6*18 = 145
+    log "Step 4b: Looking for Storage Card in root..."
+    capture_screenshot "06c-root-view"
 
-# Single-click navigates into folders in File Explorer list view
-emu_click 120 165
-sleep 3
-capture_screenshot "06d-storage-card"
+    emu_click 160 145
+    sleep 3
+    capture_screenshot "06d-storage-card"
 
-# Step 5: Find and tap navit.exe in Storage Card
-# From screenshot analysis of Storage Card listing (06d):
-#   espeak-data/      y≈57  (folder)
-#   icons/            y≈75  (folder)
-#   locale/           y≈93  (folder)
-#   navit  7.93M      y≈111 (navit.exe)
-#   navit  30.7K      y≈129 (navit.xml - opens in IE!)
-#   navit  5.46M      y≈147
-#   navit_layout_*    y≈165+
-log "Step 5: Looking for navit.exe..."
-capture_screenshot "07-folder-contents"
+    # Step 5: navit.exe is 4th item: y ≈ 37 + 3*18 = 91
+    log "Step 5: Looking for navit.exe..."
+    capture_screenshot "07-folder-contents"
 
-# navit.exe (7.93M) is the 4th item (after 3 folders, no maps/ folder)
-emu_click 120 111
-sleep 3
-capture_screenshot "07a-click-navit-exe"
+    emu_click 160 91
+    sleep 3
+    capture_screenshot "07a-click-navit-exe"
+else
+    # --- PORTRAIT MODE (240x320) ---
+    # WM screen is 240w x 320h.
+
+    # Step 1: Tap "Start" in WM title bar
+    log "Step 1: Tapping Start..."
+    emu_click 30 8
+    sleep 3
+    capture_screenshot "02-start-tapped"
+
+    # Step 2: Tap "Programs" in the Start menu
+    # Start menu layout (verified from screenshots):
+    #   Today:            y~30    Programs:         y~170
+    #   Office Mobile:    y~50    Settings:         y~190
+    #   Calendar:         y~68    Help:             y~208
+    #   Contacts:         y~86
+    #   Internet Explorer:y~104
+    #   Messaging:        y~122
+    log "Step 2: Tapping Programs..."
+    emu_click 50 170
+    sleep 3
+    capture_screenshot "03-programs-tapped"
+
+    # Step 3: Double-tap File Explorer in the Programs grid
+    # Grid layout (3 columns x 4 rows, verified from screenshots):
+    #   Row 1 (y~65-85):  Games(x~40), ActiveSync(x~120), Calculator(x~190)
+    #   Row 2 (y~140-162): File Explorer(x~40), Getting Started(x~120), Internet Sharing(x~190)
+    log "Step 3: Double-tapping File Explorer icon..."
+    emu_dblclick 40 145
+    sleep 3
+    capture_screenshot "04-after-file-explorer-dblclick"
+
+    log "Step 3b: Trying File Explorer label area..."
+    emu_dblclick 40 165
+    sleep 3
+    capture_screenshot "05-after-label-dblclick"
+
+    # Step 4: Navigate up to root, then to Storage Card
+    # Softkey bar: "Up" at bottom-left ~WM(40, 307)
+    log "Step 4: Navigating up to root..."
+
+    emu_click 40 307
+    sleep 2
+    capture_screenshot "06a-up1"
+
+    emu_click 40 307
+    sleep 2
+    capture_screenshot "06b-up2"
+
+    # Root listing (verified from screenshots):
+    #   Items ~18px tall, starting at WM y≈57:
+    #   Application D... y≈57, ConnMgr y≈75, Documents a... y≈93,
+    #   MUSIC y≈111, My Documents y≈129, Program Files y≈147,
+    #   Storage Card y≈165, Temp y≈183, Windows y≈201
+    log "Step 4b: Looking for Storage Card in root..."
+    capture_screenshot "06c-root-view"
+
+    emu_click 120 165
+    sleep 3
+    capture_screenshot "06d-storage-card"
+
+    # Step 5: navit.exe in Storage Card (verified from screenshots):
+    #   espeak-data/ y≈57, icons/ y≈75, locale/ y≈93,
+    #   navit.exe(7.93M) y≈111, navit.xml(30.7K) y≈129
+    log "Step 5: Looking for navit.exe..."
+    capture_screenshot "07-folder-contents"
+
+    emu_click 120 111
+    sleep 3
+    capture_screenshot "07a-click-navit-exe"
+fi
 
 # Give Navit time to start and render
 log "Waiting 15s for Navit to initialize..."
