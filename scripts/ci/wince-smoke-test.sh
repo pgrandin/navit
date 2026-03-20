@@ -186,83 +186,75 @@ emu_click 50 170
 sleep 3
 capture_screenshot "03-programs-tapped"
 
-# Step 3: In Programs view, find and tap File Explorer
-# Programs view shows icons in a grid. File Explorer is typically present.
-# The grid starts around y=35, icons are ~70px apart in rows
-# First try common positions in the Programs grid
-log "Step 3: Looking for File Explorer in Programs grid..."
-capture_screenshot "03b-programs-view"
+# Step 3: Tap File Explorer in the Programs grid
+# From screenshot analysis of the Programs screen:
+#   Grid layout (3 columns x 4 rows visible):
+#     Row 1 (y~90):  Games(x~40), ActiveSync(x~120), Calculator(x~190)
+#     Row 2 (y~160): File Explorer(x~40), Getting Started(x~120), Internet Sharing(x~190)
+#     Row 3 (y~230): Messenger(x~40), Notes(x~120), Pictures & Videos(x~190)
+#     Row 4 (y~300): Search(x~40), SimTkUI(x~120), Task Manager(x~190)
+log "Step 3: Tapping File Explorer..."
+emu_click 40 160
+sleep 3
+capture_screenshot "04-file-explorer"
 
-# Programs grid layout is typically 3 columns x N rows
-# Icons at approximately: col1=40, col2=120, col3=200, rows at y=50,110,170,230
-# File Explorer is usually in the first page. Try several positions.
-# We'll click each and check the result.
-emu_click 40 50
-sleep 2
-capture_screenshot "04a-programs-click1"
+# Step 4: In File Explorer, navigate to Storage Card
+# File Explorer shows the \My Device root with items like:
+#   My Documents, Program Files, Storage Card, Temp, Windows, etc.
+# Items are in a list view. "Storage Card" should be visible.
+# List items start around y=35 with ~20px spacing.
+log "Step 4: Looking for Storage Card in File Explorer..."
+capture_screenshot "05-file-explorer-view"
 
-# Check if we opened File Explorer or something else
-# If it's not File Explorer, go back and try next icon
-emu_click 120 50
-sleep 2
-capture_screenshot "04b-programs-click2"
-
-emu_click 200 50
-sleep 2
-capture_screenshot "04c-programs-click3"
-
-emu_click 40 110
-sleep 2
-capture_screenshot "04d-programs-click4"
-
-emu_click 120 110
-sleep 2
-capture_screenshot "04e-programs-click5"
-
-emu_click 200 110
-sleep 2
-capture_screenshot "04f-programs-click6"
-
-# Take a state screenshot
-capture_screenshot "05-after-grid-clicks"
-
-# If we've reached File Explorer, we should see a list of folders/files.
-# Look for "Storage Card" and tap it.
-# In File Explorer list view, items start around y=40 with ~20px spacing
-log "Step 4: Looking for Storage Card..."
-sleep 2
-
-# Try tapping items in the file list
-emu_click 120 40
-sleep 2
-capture_screenshot "06a-list-item1"
-
-emu_click 120 60
-sleep 2
-capture_screenshot "06b-list-item2"
-
+# Scroll down if needed and try tapping "Storage Card"
+# It's typically several items down in the list
+# Try tapping items from top to bottom until we find it
 emu_click 120 80
 sleep 2
-capture_screenshot "06c-list-item3"
+capture_screenshot "06a-fe-item1"
 
-# Step 5: If we're in a folder, look for navit.exe
+emu_click 120 100
+sleep 2
+capture_screenshot "06b-fe-item2"
+
+emu_click 120 120
+sleep 2
+capture_screenshot "06c-fe-item3"
+
+emu_click 120 140
+sleep 2
+capture_screenshot "06d-fe-item4"
+
+emu_click 120 160
+sleep 2
+capture_screenshot "06e-fe-item5"
+
+# Step 5: In Storage Card folder, find and tap navit.exe
 log "Step 5: Looking for navit.exe..."
-emu_click 120 40
-sleep 2
-capture_screenshot "07a-navit-try1"
+capture_screenshot "07-storage-card-contents"
 
+# navit.exe should be one of the items in the folder
+# The build produces: navit.exe, navit.xml, icons/, locale/, espeak-data/, maps/
 emu_click 120 60
 sleep 2
-capture_screenshot "07b-navit-try2"
+capture_screenshot "08a-item1"
 
 emu_click 120 80
 sleep 2
-capture_screenshot "07c-navit-try3"
+capture_screenshot "08b-item2"
+
+emu_click 120 100
+sleep 2
+capture_screenshot "08c-item3"
+
+emu_click 120 120
+sleep 2
+capture_screenshot "08d-item4"
 
 # Give Navit time to start and render
 log "Waiting 15s for Navit to initialize..."
 sleep 15
-capture_screenshot "08-navit-running"
+capture_screenshot "09-navit-running"
 
 # --- Monitor for remaining time ---
 REMAINING=$((SMOKE_TIMEOUT - (SECONDS - START)))
