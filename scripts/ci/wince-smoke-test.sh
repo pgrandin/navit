@@ -83,7 +83,7 @@ log "Navit package: $(find "$NAVIT_DIR" -type f | wc -l) files"
 
 # --- Start Xvfb ---
 log "Starting Xvfb..."
-Xvfb :99 -screen 0 800x600x24 &
+Xvfb :99 -screen 0 320x480x24 &
 XVFB_PID=$!
 export DISPLAY=:99
 sleep 2
