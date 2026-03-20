@@ -186,10 +186,22 @@ else
     import -window root "$RESULTS_DIR/04-submenu-hover-$(date '+%H%M%S').png" 2>/dev/null || true
     xdotool click 1
     sleep 2
-    import -window root "$RESULTS_DIR/05-after-reset-click-$(date '+%H%M%S').png" 2>/dev/null || true
-    log "Soft reset click attempted"
+    import -window root "$RESULTS_DIR/05-after-soft-click-$(date '+%H%M%S').png" 2>/dev/null || true
 
-    # Wait for the emulator to re-detect the window after reset
+    # A confirmation dialog appears: "Are you sure you want to reset the guest OS?"
+    # with Yes and No buttons. Click "Yes" to confirm.
+    CONFIRM_WID="$(xdotool search --name 'Device Emulator' 2>/dev/null | tail -1 || true)"
+    log "Confirmation dialog search result: $CONFIRM_WID"
+
+    # The "Yes" button is on the left side of the dialog, roughly centered.
+    # From screenshot: dialog is centered in the window, Yes at ~(130, 275)
+    # relative to emulator window. Just press Enter since Yes appears focused.
+    xdotool key --window "$CONFIRM_WID" Return
+    sleep 1
+    import -window root "$RESULTS_DIR/06-after-confirm-$(date '+%H%M%S').png" 2>/dev/null || true
+    log "Soft reset confirmed"
+
+    # Wait for the emulator to reboot
     sleep 5
     EMU_WID2="$(xdotool search --name 'Device Emulator' 2>/dev/null | head -1 || true)"
     if [ -n "$EMU_WID2" ]; then
@@ -202,7 +214,7 @@ fi
 # --- Wait for second boot + autorun ---
 log "Waiting 30s for WinCE to reboot and autorun.exe to launch Navit..."
 sleep 30
-capture_screenshot "06-post-reset"
+capture_screenshot "07-post-reset"
 
 # --- Monitor for remaining time ---
 REMAINING=$((SMOKE_TIMEOUT - (SECONDS - START)))
