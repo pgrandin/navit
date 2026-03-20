@@ -30,8 +30,15 @@ log() { echo "[$(date '+%H:%M:%S')] $*" | tee -a "$RESULTS_DIR/smoke-test.log"; 
 capture_screenshot() {
     local label="${1:-screenshot}"
     local outfile="$RESULTS_DIR/${label}-$(date '+%H%M%S').png"
-    import -window root "$outfile" 2>/dev/null && \
-        log "Screenshot: $outfile" || true
+    local wid
+    wid="$(xdotool search --name 'Device Emulator' 2>/dev/null | head -1 || true)"
+    if [ -n "$wid" ]; then
+        import -window "$wid" "$outfile" 2>/dev/null && \
+            log "Screenshot: $outfile" || true
+    else
+        import -window root "$outfile" 2>/dev/null && \
+            log "Screenshot (root): $outfile" || true
+    fi
 }
 
 # Click inside the WM screen area of the emulator.
