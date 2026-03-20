@@ -146,58 +146,85 @@ EMU_WID="$(xdotool search --name 'Device Emulator' 2>/dev/null | head -1 || true
 if [ -z "$EMU_WID" ]; then
     log "WARNING: Could not find Device Emulator window for hot-plug"
 else
-    # Focus the emulator window and open File > Configure
-    xdotool windowfocus --sync "$EMU_WID" 2>/dev/null || true
-    xdotool windowraise "$EMU_WID" 2>/dev/null || true
-    sleep 1
-    xdotool key --window "$EMU_WID" alt+f
-    sleep 1
-    capture_screenshot "02-file-menu"
-
-    # Click "Configure..." menu item (send 'c' key as accelerator)
-    xdotool key --window "$EMU_WID" c
-    sleep 2
-    capture_screenshot "03-configure-dialog"
-
-    # The Configure dialog should now be open. Find it.
-    CFG_WID="$(xdotool search --name 'Emulator Properties' 2>/dev/null | head -1 || true)"
-    if [ -z "$CFG_WID" ]; then
-        # Try alternative dialog title
-        CFG_WID="$(xdotool search --name 'Configure' 2>/dev/null | head -1 || true)"
-    fi
-    if [ -z "$CFG_WID" ]; then
-        log "WARNING: Configure dialog not found, falling back to emulator window"
-        CFG_WID="$EMU_WID"
-    fi
-    log "Configure dialog window: $CFG_WID"
-
-    # The General tab should be active by default.
-    # The Shared folder field is the last text input on the General tab.
-    # Tab through the dialog fields to reach it, then type the path.
-    # Fields: ROM image, ROM address, RAM size, Flash file, Host key, FuncKey, Shared folder
-    for i in $(seq 1 12); do
-        xdotool key --window "$CFG_WID" Tab
-        sleep 0.2
-    done
+    # Click "File" in the host menu bar using window-relative coordinates.
+    # The menu bar is rendered by Wine at the top of the window.
+    # "File" text is at approximately x=15, y=8 in the window.
+    xdotool windowfocus "$EMU_WID" 2>/dev/null || true
     sleep 0.5
 
-    # Type the Windows path to the shared folder
-    xdotool type --window "$CFG_WID" --delay 50 "$SHARE_WIN"
+    # Get window position for absolute coordinate calculation
+    eval "$(xdotool getwindowgeometry --shell "$EMU_WID" 2>/dev/null)" || true
+    log "Emulator window at X=$X Y=$Y W=${WIDTH:-?} H=${HEIGHT:-?}"
+
+    # Click on "File" menu text in the menu bar
+    xdotool mousemove --window "$EMU_WID" 15 8
+    sleep 0.3
+    xdotool click --window "$EMU_WID" 1
     sleep 1
-    capture_screenshot "04-shared-folder-set"
+    # Take a full-screen screenshot to see the menu dropdown
+    import -window root "$RESULTS_DIR/02-file-menu-$(date '+%H%M%S').png" 2>/dev/null || true
+    log "Screenshot: 02-file-menu (root)"
 
-    # Press Enter to confirm (OK button)
-    xdotool key --window "$CFG_WID" Return
+    # "Configure..." should be in the dropdown menu (a separate popup window).
+    # The dropdown appears below the menu bar at absolute screen coordinates.
+    # Menu items are ~20px tall. Configure is the 1st item under File.
+    # Calculate absolute position: window Y + menu bar height (~19px) + item offset
+    MENU_X=$((X + 15))
+    MENU_Y=$((Y + 28))
+    log "Clicking Configure at absolute ($MENU_X, $MENU_Y)"
+    xdotool mousemove "$MENU_X" "$MENU_Y"
+    sleep 0.3
+    xdotool click 1
     sleep 2
-    capture_screenshot "05-after-hotplug"
+    import -window root "$RESULTS_DIR/03-after-menu-click-$(date '+%H%M%S').png" 2>/dev/null || true
+    log "Screenshot: 03-after-menu-click (root)"
 
+    # Search for any new dialog window that appeared
+    CFG_WID=""
+    for title in "Emulator Properties" "Configure" "General"; do
+        CFG_WID="$(xdotool search --name "$title" 2>/dev/null | head -1 || true)"
+        [ -n "$CFG_WID" ] && break
+    done
+
+    if [ -n "$CFG_WID" ]; then
+        log "Configure dialog found: $CFG_WID"
+        import -window root "$RESULTS_DIR/04-configure-dialog-$(date '+%H%M%S').png" 2>/dev/null || true
+
+        # Tab through to the Shared folder field, then type the path
+        xdotool windowfocus "$CFG_WID" 2>/dev/null || true
+        sleep 0.5
+        for i in $(seq 1 12); do
+            xdotool key --window "$CFG_WID" Tab
+            sleep 0.2
+        done
+        sleep 0.5
+        xdotool type --window "$CFG_WID" --delay 50 "$SHARE_WIN"
+        sleep 1
+        import -window root "$RESULTS_DIR/05-shared-folder-set-$(date '+%H%M%S').png" 2>/dev/null || true
+
+        # Press Enter to confirm (OK button)
+        xdotool key --window "$CFG_WID" Return
+        sleep 2
+        log "Shared folder set via Configure dialog"
+    else
+        log "WARNING: Configure dialog not found. Trying keyboard shortcut approach..."
+        import -window root "$RESULTS_DIR/04-no-dialog-$(date '+%H%M%S').png" 2>/dev/null || true
+
+        # Fallback: try sending Alt+F,C via X keyboard events to the root
+        xdotool key alt+f
+        sleep 1
+        xdotool key c
+        sleep 2
+        import -window root "$RESULTS_DIR/05-fallback-$(date '+%H%M%S').png" 2>/dev/null || true
+    fi
+    capture_screenshot "06-after-hotplug"
     log "Shared folder hot-plug attempted: $SHARE_WIN"
 fi
 
 # --- Wait for autorun to trigger ---
 log "Waiting 15s for autorun.exe to launch Navit..."
 sleep 15
-capture_screenshot "06-navit-check"
+capture_screenshot "07-navit-check"
 
 # --- Monitor for remaining time ---
 REMAINING=$((SMOKE_TIMEOUT - (SECONDS - START)))
