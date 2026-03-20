@@ -224,20 +224,23 @@ if [ "$ROTATE" = "1" ] || [ "$ROTATE" = "3" ]; then
     sleep 2
     capture_screenshot "06b-up2"
 
-    # Root listing — same items, ~18px rows starting at y≈37
-    # Storage Card is 7th item: y ≈ 37 + 6*18 = 145
+    # Root listing (verified from landscape screenshot):
+    #   Items ~18px tall, starting at y≈50:
+    #   Application Data y≈50, ConnMgr y≈68, Documents and Settings y≈86,
+    #   MUSIC y≈104, My Documents y≈122, Program Files y≈140,
+    #   Storage Card y≈158, Temp y≈176, Windows y≈194
     log "Step 4b: Looking for Storage Card in root..."
     capture_screenshot "06c-root-view"
 
-    emu_click 160 145
+    emu_click 160 158
     sleep 3
     capture_screenshot "06d-storage-card"
 
-    # navit.exe is 4th item: y ≈ 37 + 3*18 = 91
+    # navit.exe is 4th item: y ≈ 50 + 3*18 = 104
     log "Step 5: Looking for navit.exe..."
     capture_screenshot "07-folder-contents"
 
-    emu_click 160 91
+    emu_click 160 104
     sleep 3
     capture_screenshot "07a-click-navit-exe"
 else
