@@ -206,74 +206,65 @@ emu_dblclick 40 165
 sleep 3
 capture_screenshot "05-after-label-dblclick"
 
-# Step 4: Navigate File Explorer to Storage Card
-# File Explorer shows \My Device root. Items in list view with ~20px rows.
-# Typical items: My Documents, Program Files, Storage Card, Temp, Windows
-# "Storage Card" is the shared folder from /sharedfolder flag.
-log "Step 4: Navigating to Storage Card..."
-capture_screenshot "06-current-view"
+# Step 4: Navigate up to root, then to Storage Card
+# File Explorer opened in "Templates" folder. Need to go up to My Device root.
+# Bottom softkey bar: "Up" at bottom-left ~WM(40, 307), "Menu" at bottom-right ~WM(200, 307)
+log "Step 4: Navigating up to root..."
 
-# Tap through the list looking for Storage Card
-# In File Explorer list, folders appear with folder icons, ~20px spacing
-# starting around y=35 below the address bar
-emu_click 120 55
-sleep 1
-capture_screenshot "06a-item1"
+# Tap "Up" to go from Templates -> My Documents
+emu_click 40 307
+sleep 2
+capture_screenshot "06a-up1"
 
-emu_click 120 75
-sleep 1
-capture_screenshot "06b-item2"
+# Tap "Up" again to go from My Documents -> My Device (root)
+emu_click 40 307
+sleep 2
+capture_screenshot "06b-up2"
 
-emu_click 120 95
-sleep 1
-capture_screenshot "06c-item3"
+# Now we should be at \My Device root.
+# Contents typically: My Documents, Program Files, Storage Card, Temp, Windows
+# Storage Card is the shared folder. Look for it in the list.
+# File Explorer list items: ~20px tall, starting around y=40
+log "Step 4b: Looking for Storage Card in root..."
+capture_screenshot "06c-root-view"
 
-emu_click 120 115
-sleep 1
-capture_screenshot "06d-item4"
+# Tap on items - Storage Card should be 3rd or 4th item
+# Items: My Documents(~y=40), Program Files(~y=60), Storage Card(~y=80)
+emu_click 120 80
+sleep 2
+capture_screenshot "06d-item-storage-card"
 
-emu_click 120 135
-sleep 1
-capture_screenshot "06e-item5"
+# If that was the wrong item, try the next ones
+emu_click 120 100
+sleep 2
+capture_screenshot "06e-item4"
 
-emu_click 120 155
-sleep 1
-capture_screenshot "06f-item6"
-
-emu_click 120 175
-sleep 1
-capture_screenshot "06g-item7"
+emu_click 120 120
+sleep 2
+capture_screenshot "06f-item5"
 
 # Step 5: Find and tap navit.exe in Storage Card
-log "Step 5: Looking for navit.exe..."
-capture_screenshot "07-looking-for-navit"
-
 # The shared folder contains: espeak-data/, icons/, locale/, maps/,
 # navit.exe, navit.xml, navit_layout_*.xml
-# navit.exe should be after the folders alphabetically
-emu_click 120 55
-sleep 1
-capture_screenshot "07a-try1"
+# Folders come first alphabetically, then files:
+#   espeak-data/ (~y=40), icons/ (~y=60), locale/ (~y=80), maps/ (~y=100),
+#   navit.exe (~y=120), navit.xml (~y=140), navit_layout_*.xml (~y=160+)
+log "Step 5: Looking for navit.exe..."
+capture_screenshot "07-folder-contents"
 
-emu_click 120 75
-sleep 1
-capture_screenshot "07b-try2"
+# navit.exe should be around the 5th item (after 4 folders)
+emu_click 120 120
+sleep 2
+capture_screenshot "07a-click-navit-exe"
 
-emu_click 120 95
-sleep 1
-capture_screenshot "07c-try3"
+# Try adjacent positions in case the list ordering is different
+emu_click 120 100
+sleep 2
+capture_screenshot "07b-click-alt1"
 
-emu_click 120 115
-sleep 1
-capture_screenshot "07d-try4"
-
-emu_click 120 135
-sleep 1
-capture_screenshot "07e-try5"
-
-emu_click 120 155
-sleep 1
-capture_screenshot "07f-try6"
+emu_click 120 140
+sleep 2
+capture_screenshot "07c-click-alt2"
 
 # Give Navit time to start and render
 log "Waiting 15s for Navit to initialize..."
