@@ -242,19 +242,19 @@ sleep 3
 capture_screenshot "06d-storage-card"
 
 # Step 5: Find and tap navit.exe in Storage Card
-# The shared folder contains (folders first, then files alphabetically):
-#   espeak-data/   y≈57
-#   icons/         y≈75
-#   locale/        y≈93
-#   maps/          y≈111
-#   navit.exe      y≈129
-#   navit.xml      y≈147
-#   navit_layout_* y≈165+
+# From screenshot analysis of Storage Card listing (06d):
+#   espeak-data/      y≈57  (folder)
+#   icons/            y≈75  (folder)
+#   locale/           y≈93  (folder)
+#   navit  7.93M      y≈111 (navit.exe)
+#   navit  30.7K      y≈129 (navit.xml - opens in IE!)
+#   navit  5.46M      y≈147
+#   navit_layout_*    y≈165+
 log "Step 5: Looking for navit.exe..."
 capture_screenshot "07-folder-contents"
 
-# navit.exe should be the 5th item (after 4 folders)
-emu_click 120 129
+# navit.exe (7.93M) is the 4th item (after 3 folders, no maps/ folder)
+emu_click 120 111
 sleep 3
 capture_screenshot "07a-click-navit-exe"
 
