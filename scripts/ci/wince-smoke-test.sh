@@ -147,34 +147,47 @@ if [ -z "$EMU_WID" ]; then
     log "WARNING: Could not find Device Emulator window for hot-plug"
 else
     # Focus the emulator window and open File > Configure
-    xdotool windowactivate --sync "$EMU_WID"
+    xdotool windowfocus --sync "$EMU_WID" 2>/dev/null || true
+    xdotool windowraise "$EMU_WID" 2>/dev/null || true
     sleep 1
-    xdotool key alt+f
+    xdotool key --window "$EMU_WID" alt+f
     sleep 1
     capture_screenshot "02-file-menu"
 
     # Click "Configure..." menu item (send 'c' key as accelerator)
-    xdotool key c
+    xdotool key --window "$EMU_WID" c
     sleep 2
     capture_screenshot "03-configure-dialog"
+
+    # The Configure dialog should now be open. Find it.
+    CFG_WID="$(xdotool search --name 'Emulator Properties' 2>/dev/null | head -1 || true)"
+    if [ -z "$CFG_WID" ]; then
+        # Try alternative dialog title
+        CFG_WID="$(xdotool search --name 'Configure' 2>/dev/null | head -1 || true)"
+    fi
+    if [ -z "$CFG_WID" ]; then
+        log "WARNING: Configure dialog not found, falling back to emulator window"
+        CFG_WID="$EMU_WID"
+    fi
+    log "Configure dialog window: $CFG_WID"
 
     # The General tab should be active by default.
     # The Shared folder field is the last text input on the General tab.
     # Tab through the dialog fields to reach it, then type the path.
     # Fields: ROM image, ROM address, RAM size, Flash file, Host key, FuncKey, Shared folder
     for i in $(seq 1 12); do
-        xdotool key Tab
+        xdotool key --window "$CFG_WID" Tab
         sleep 0.2
     done
     sleep 0.5
 
     # Type the Windows path to the shared folder
-    xdotool type --delay 50 "$SHARE_WIN"
+    xdotool type --window "$CFG_WID" --delay 50 "$SHARE_WIN"
     sleep 1
     capture_screenshot "04-shared-folder-set"
 
     # Press Enter to confirm (OK button)
-    xdotool key Return
+    xdotool key --window "$CFG_WID" Return
     sleep 2
     capture_screenshot "05-after-hotplug"
 
