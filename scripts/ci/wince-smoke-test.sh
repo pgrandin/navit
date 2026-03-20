@@ -222,49 +222,41 @@ sleep 2
 capture_screenshot "06b-up2"
 
 # Now we should be at \My Device root.
-# Contents typically: My Documents, Program Files, Storage Card, Temp, Windows
-# Storage Card is the shared folder. Look for it in the list.
-# File Explorer list items: ~20px tall, starting around y=40
+# From screenshot analysis of root listing (06c):
+#   List items are ~18px tall, starting at WM y≈57:
+#   Application D...  y≈57
+#   ConnMgr           y≈75
+#   Documents a...    y≈93
+#   MUSIC             y≈111
+#   My Documents      y≈129
+#   Program Files     y≈147
+#   Storage Card      y≈165
+#   Temp              y≈183
+#   Windows           y≈201
 log "Step 4b: Looking for Storage Card in root..."
 capture_screenshot "06c-root-view"
 
-# Tap on items - Storage Card should be 3rd or 4th item
-# Items: My Documents(~y=40), Program Files(~y=60), Storage Card(~y=80)
-emu_click 120 80
-sleep 2
-capture_screenshot "06d-item-storage-card"
-
-# If that was the wrong item, try the next ones
-emu_click 120 100
-sleep 2
-capture_screenshot "06e-item4"
-
-emu_click 120 120
-sleep 2
-capture_screenshot "06f-item5"
+# Single-click navigates into folders in File Explorer list view
+emu_click 120 165
+sleep 3
+capture_screenshot "06d-storage-card"
 
 # Step 5: Find and tap navit.exe in Storage Card
-# The shared folder contains: espeak-data/, icons/, locale/, maps/,
-# navit.exe, navit.xml, navit_layout_*.xml
-# Folders come first alphabetically, then files:
-#   espeak-data/ (~y=40), icons/ (~y=60), locale/ (~y=80), maps/ (~y=100),
-#   navit.exe (~y=120), navit.xml (~y=140), navit_layout_*.xml (~y=160+)
+# The shared folder contains (folders first, then files alphabetically):
+#   espeak-data/   y≈57
+#   icons/         y≈75
+#   locale/        y≈93
+#   maps/          y≈111
+#   navit.exe      y≈129
+#   navit.xml      y≈147
+#   navit_layout_* y≈165+
 log "Step 5: Looking for navit.exe..."
 capture_screenshot "07-folder-contents"
 
-# navit.exe should be around the 5th item (after 4 folders)
-emu_click 120 120
-sleep 2
+# navit.exe should be the 5th item (after 4 folders)
+emu_click 120 129
+sleep 3
 capture_screenshot "07a-click-navit-exe"
-
-# Try adjacent positions in case the list ordering is different
-emu_click 120 100
-sleep 2
-capture_screenshot "07b-click-alt1"
-
-emu_click 120 140
-sleep 2
-capture_screenshot "07c-click-alt2"
 
 # Give Navit time to start and render
 log "Waiting 15s for Navit to initialize..."
