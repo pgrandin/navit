@@ -189,16 +189,22 @@ else
     import -window root "$RESULTS_DIR/05-after-soft-click-$(date '+%H%M%S').png" 2>/dev/null || true
 
     # A confirmation dialog appears: "Are you sure you want to reset the guest OS?"
-    # with Yes and No buttons. Click "Yes" to confirm.
-    CONFIRM_WID="$(xdotool search --name 'Device Emulator' 2>/dev/null | tail -1 || true)"
-    log "Confirmation dialog search result: $CONFIRM_WID"
-
-    # The "Yes" button is on the left side of the dialog, roughly centered.
-    # From screenshot: dialog is centered in the window, Yes at ~(130, 275)
-    # relative to emulator window. Just press Enter since Yes appears focused.
-    xdotool key --window "$CONFIRM_WID" Return
+    # with Yes and No buttons. Click "Yes" with mouse coordinates.
+    # From screenshots: Yes button is at approximately (140, 305) in root window.
+    # The dialog is rendered inside the emulator window area.
     sleep 1
-    import -window root "$RESULTS_DIR/06-after-confirm-$(date '+%H%M%S').png" 2>/dev/null || true
+    import -window root "$RESULTS_DIR/06-confirm-dialog-$(date '+%H%M%S').png" 2>/dev/null || true
+
+    # Click "Yes" button — it's at roughly window-relative (75, 275) based on
+    # the dialog being centered in the 240-wide emulator window
+    YES_X=$((X + 75))
+    YES_Y=$((Y + 275))
+    log "Clicking Yes at absolute ($YES_X, $YES_Y)"
+    xdotool mousemove "$YES_X" "$YES_Y"
+    sleep 0.3
+    xdotool click 1
+    sleep 1
+    import -window root "$RESULTS_DIR/07-after-confirm-$(date '+%H%M%S').png" 2>/dev/null || true
     log "Soft reset confirmed"
 
     # Wait for the emulator to reboot
@@ -214,7 +220,7 @@ fi
 # --- Wait for second boot + autorun ---
 log "Waiting 30s for WinCE to reboot and autorun.exe to launch Navit..."
 sleep 30
-capture_screenshot "07-post-reset"
+capture_screenshot "08-post-reset"
 
 # --- Monitor for remaining time ---
 REMAINING=$((SMOKE_TIMEOUT - (SECONDS - START)))
