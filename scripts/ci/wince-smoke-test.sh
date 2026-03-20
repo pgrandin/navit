@@ -165,12 +165,16 @@ else
     import -window root "$RESULTS_DIR/02-file-menu-$(date '+%H%M%S').png" 2>/dev/null || true
     log "Screenshot: 02-file-menu (root)"
 
-    # "Configure..." should be in the dropdown menu (a separate popup window).
-    # The dropdown appears below the menu bar at absolute screen coordinates.
-    # Menu items are ~20px tall. Configure is the 1st item under File.
-    # Calculate absolute position: window Y + menu bar height (~19px) + item offset
-    MENU_X=$((X + 15))
-    MENU_Y=$((Y + 28))
+    # "Configure..." is the 4th item in the File dropdown menu:
+    #   Save State and Exit  (~16px)
+    #   Clear Saved State    (~16px)
+    #   Reset >              (~16px)
+    #   Configure...         (~16px)  <-- target
+    #   Exit                 (~16px)
+    # The dropdown appears below the menu bar (19px tall).
+    # Each item is ~16px. Configure starts at offset ~67px from window top.
+    MENU_X=$((X + 30))
+    MENU_Y=$((Y + 19 + 16*3 + 8))
     log "Clicking Configure at absolute ($MENU_X, $MENU_Y)"
     xdotool mousemove "$MENU_X" "$MENU_Y"
     sleep 0.3
