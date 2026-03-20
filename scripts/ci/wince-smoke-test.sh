@@ -185,7 +185,6 @@ fi
 if [ "$ROTATE" = "1" ] || [ "$ROTATE" = "3" ]; then
     # --- LANDSCAPE MODE (320x240) ---
     # WM screen is 320w x 240h. Title bar at top, softkeys at bottom.
-    # Start button at top-left. Coordinates are estimated for first run.
 
     # Step 1: Tap "Start"
     log "Step 1: Tapping Start..."
@@ -193,29 +192,29 @@ if [ "$ROTATE" = "1" ] || [ "$ROTATE" = "3" ]; then
     sleep 3
     capture_screenshot "02-start-tapped"
 
-    # Step 2: Tap "Programs" — menu is taller than screen, Programs near bottom
-    # In landscape the start menu shows fewer items before scrolling.
-    # Items are same height (~18px) but menu may need scrolling.
+    # Step 2: Tap "Programs" (verified from landscape screenshot)
     log "Step 2: Tapping Programs..."
-    emu_click 50 170
+    emu_click 50 150
     sleep 3
     capture_screenshot "03-programs-tapped"
 
     # Step 3: Double-tap File Explorer in Programs grid
-    # Landscape grid may have more columns or same layout shifted.
-    # File Explorer: Row 2, Col 1 — estimate same relative position.
+    # Landscape grid is 4 columns x 3 rows (verified from screenshot):
+    #   Row 1 (y~65): Games(x~40), ActiveSync(x~115), Calculator(x~195), File Explorer(x~270)
+    #   Row 2 (y~140): Getting Started(x~40), Internet Sharing(x~115), Messenger(x~195), Notes(x~270)
+    #   Row 3 (y~210): Pictures&(x~40), Search(x~115), SimTkUI(x~195), Task(x~270)
     log "Step 3: Double-tapping File Explorer icon..."
-    emu_dblclick 40 145
+    emu_dblclick 270 65
     sleep 3
     capture_screenshot "04-after-file-explorer-dblclick"
 
     log "Step 3b: Trying File Explorer label area..."
-    emu_dblclick 40 165
+    emu_dblclick 270 80
     sleep 3
     capture_screenshot "05-after-label-dblclick"
 
     # Step 4: Navigate up to root
-    # Softkey bar: "Up" at bottom-left ~WM(40, 227)
+    # Softkey bar at bottom of 240px screen: "Up" at ~WM(40, 227)
     log "Step 4: Navigating up to root..."
     emu_click 40 227
     sleep 2
@@ -225,8 +224,7 @@ if [ "$ROTATE" = "1" ] || [ "$ROTATE" = "3" ]; then
     sleep 2
     capture_screenshot "06b-up2"
 
-    # Root listing — same item order, same ~18px row height
-    # In landscape the list area starts at ~y=37 (shorter title/address bar)
+    # Root listing — same items, ~18px rows starting at y≈37
     # Storage Card is 7th item: y ≈ 37 + 6*18 = 145
     log "Step 4b: Looking for Storage Card in root..."
     capture_screenshot "06c-root-view"
@@ -235,7 +233,7 @@ if [ "$ROTATE" = "1" ] || [ "$ROTATE" = "3" ]; then
     sleep 3
     capture_screenshot "06d-storage-card"
 
-    # Step 5: navit.exe is 4th item: y ≈ 37 + 3*18 = 91
+    # navit.exe is 4th item: y ≈ 37 + 3*18 = 91
     log "Step 5: Looking for navit.exe..."
     capture_screenshot "07-folder-contents"
 
