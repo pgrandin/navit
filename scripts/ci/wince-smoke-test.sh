@@ -60,10 +60,13 @@ log "DeviceEmulator.exe: $(du -h "$EMU_DIR/DeviceEmulator.exe" | cut -f1)"
 log "rom.bin: $(du -h "$EMU_DIR/rom.bin" | cut -f1)"
 log "Navit package: $(find "$NAVIT_DIR" -type f | wc -l) files"
 
-# --- Auto-start: copy navit.exe as autorun.exe on the Storage Card ---
-# WinCE auto-executes \Storage Card\autorun.exe when the card is detected.
+# --- Auto-start: place navit.exe as autorun.exe on the Storage Card ---
+# WinCE auto-runs \Storage Card\2577\autorun.exe (2577 = ARM ARMV4I processor type)
+# when a storage card is detected. Also place in root as fallback.
+mkdir -p "$NAVIT_DIR/2577"
+cp "$NAVIT_DIR/navit.exe" "$NAVIT_DIR/2577/autorun.exe"
 cp "$NAVIT_DIR/navit.exe" "$NAVIT_DIR/autorun.exe"
-log "Created autorun.exe ($(du -h "$NAVIT_DIR/autorun.exe" | cut -f1))"
+log "Created 2577/autorun.exe and autorun.exe"
 
 # --- Start Xvfb ---
 log "Starting Xvfb (rotate=$ROTATE)..."
