@@ -120,10 +120,14 @@ SHARE_WIN="$(winepath -w "$(realpath "$NAVIT_DIR")")"
 # --- Launch Device Emulator ---
 log "Launching Device Emulator..."
 
+EMU_ARGS=("$ROM_WIN" /memsize 128 /sharedfolder "$SHARE_WIN")
+if [ "$ROTATE" = "1" ] || [ "$ROTATE" = "3" ]; then
+    # Override video mode for landscape (320x240 instead of default 240x320)
+    EMU_ARGS+=(/video 320x240x16)
+fi
+
 wine "$EMU_DIR/DeviceEmulator.exe" \
-    "$ROM_WIN" \
-    /memsize 128 \
-    /sharedfolder "$SHARE_WIN" \
+    "${EMU_ARGS[@]}" \
     > "$RESULTS_DIR/wine-output.log" 2>&1 &
 EMU_PID=$!
 log "Device Emulator PID: $EMU_PID"
@@ -174,36 +178,7 @@ if [ -n "$WIN_ID" ]; then
     sleep 0.5
 fi
 
-# Rotate screen if requested. Device Emulator doesn't support /rotate CLI flag.
-# Keyboard goes to WM guest, so use click-drag on Wine menu bar instead.
-# Click Flash, hold, drag to dropdown item, release.
 if [ "$ROTATE" != "0" ]; then
-    log "Rotating screen $ROTATE x 90 degrees via Flash menu..."
-    for i in $(seq 1 "$ROTATE"); do
-        # Press-and-hold on "Flash" in Wine menu bar, drag to dropdown item
-        xdotool mousemove --window "$WIN_ID" 50 12
-        sleep 0.2
-        xdotool mousedown 1
-        sleep 0.5
-        capture_screenshot "00-flash-held-$i"
-        # Drag down to first dropdown item
-        xdotool mousemove --window "$WIN_ID" 50 28
-        sleep 0.5
-        capture_screenshot "00-flash-drag1-$i"
-        # Try second item
-        xdotool mousemove --window "$WIN_ID" 50 42
-        sleep 0.5
-        capture_screenshot "00-flash-drag2-$i"
-        # Try third item
-        xdotool mousemove --window "$WIN_ID" 50 56
-        sleep 0.5
-        capture_screenshot "00-flash-drag3-$i"
-        # Release on whichever item we're on - we'll check screenshots
-        xdotool mouseup 1
-        sleep 2
-        capture_screenshot "00-rotate-result-$i"
-    done
-    sleep 3
     capture_screenshot "00-after-rotate"
 fi
 
