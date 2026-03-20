@@ -120,13 +120,10 @@ SHARE_WIN="$(winepath -w "$(realpath "$NAVIT_DIR")")"
 # --- Launch Device Emulator ---
 log "Launching Device Emulator..."
 
-EMU_ARGS=("$ROM_WIN" /memsize 128 /sharedfolder "$SHARE_WIN")
-if [ "$ROTATE" != "0" ]; then
-    EMU_ARGS+=(/rotate "$ROTATE")
-fi
-
 wine "$EMU_DIR/DeviceEmulator.exe" \
-    "${EMU_ARGS[@]}" \
+    "$ROM_WIN" \
+    /memsize 128 \
+    /sharedfolder "$SHARE_WIN" \
     > "$RESULTS_DIR/wine-output.log" 2>&1 &
 EMU_PID=$!
 log "Device Emulator PID: $EMU_PID"
@@ -175,6 +172,29 @@ if [ -n "$WIN_ID" ]; then
     xdotool windowactivate "$WIN_ID" 2>/dev/null || true
     xdotool windowfocus "$WIN_ID" 2>/dev/null || true
     sleep 0.5
+fi
+
+# Rotate screen if requested. Device Emulator doesn't support /rotate CLI flag.
+# Use the Wine menu bar: Flash > Rotate Right (each = 90 degrees clockwise).
+# Wine menu bar is at screen y≈12. "Flash" text center is at screen x≈50.
+if [ "$ROTATE" != "0" ]; then
+    log "Rotating screen $ROTATE x 90 degrees via Flash menu..."
+    for i in $(seq 1 "$ROTATE"); do
+        # Click "Flash" in the Wine menu bar (screen coords, not WM coords)
+        xdotool mousemove 50 12
+        sleep 0.3
+        xdotool mousedown 1; sleep 0.1; xdotool mouseup 1
+        sleep 1
+        capture_screenshot "00-flash-menu-$i"
+        # Click "Rotate Right" — first item or second item in dropdown
+        # Estimate dropdown item at ~screen(50, 30) for first item, (50, 45) for second
+        xdotool mousemove 80 45
+        sleep 0.2
+        xdotool mousedown 1; sleep 0.1; xdotool mouseup 1
+        sleep 2
+    done
+    sleep 3
+    capture_screenshot "00-after-rotate"
 fi
 
 if [ "$ROTATE" = "1" ] || [ "$ROTATE" = "3" ]; then
