@@ -61,12 +61,14 @@ log "rom.bin: $(du -h "$EMU_DIR/rom.bin" | cut -f1)"
 log "Navit package: $(find "$NAVIT_DIR" -type f | wc -l) files"
 
 # --- Auto-start setup ---
-# WinCE executes all .exe files in \Storage Card\StartUp\ at end of boot.
-# Since /sharedfolder maps to \Storage Card, we create StartUp/navit.exe.
-mkdir -p "$NAVIT_DIR/StartUp"
-# Create a .lnk shortcut (WinCE text format: <charcount>#<command>)
-printf '27#\\Storage Card\\navit.exe' > "$NAVIT_DIR/StartUp/navit.lnk"
-log "Created StartUp/navit.lnk for auto-launch"
+# Place autorun.exe in the ARM processor-specific subfolder (2577 = ARMV4I).
+# WinCE shell calls SHGetAutoRunPath() when a storage card is inserted and
+# runs \Storage Card\<procID>\autorun.exe automatically.
+# We boot WITHOUT /sharedfolder and hot-plug it later via the Device Emulator's
+# File > Configure dialog so the shell sees a genuine card-insertion event.
+mkdir -p "$NAVIT_DIR/2577"
+cp "$NAVIT_DIR/navit.exe" "$NAVIT_DIR/2577/autorun.exe"
+log "Created 2577/autorun.exe for SD card autorun"
 
 # --- Start Xvfb ---
 log "Starting Xvfb (rotate=$ROTATE)..."
@@ -92,10 +94,12 @@ log "Wine initialized"
 ROM_WIN="$(winepath -w "$(realpath "$EMU_DIR/rom.bin")")"
 SHARE_WIN="$(winepath -w "$(realpath "$NAVIT_DIR")")"
 
-# --- Launch Device Emulator ---
-log "Launching Device Emulator..."
+# --- Launch Device Emulator (without shared folder) ---
+# Boot without /sharedfolder so we can hot-plug it later via the Configure
+# dialog, triggering a genuine SD card insertion event for autorun.exe.
+log "Launching Device Emulator (no shared folder)..."
 
-EMU_ARGS=("$ROM_WIN" /memsize 128 /sharedfolder "$SHARE_WIN")
+EMU_ARGS=("$ROM_WIN" /memsize 128)
 if [ "$ROTATE" = "1" ] || [ "$ROTATE" = "3" ]; then
     EMU_ARGS+=(/video 320x240x16)
 fi
@@ -124,8 +128,8 @@ for i in $(seq 1 30); do
     sleep 2
 done
 
-# --- Let WM finish booting + autorun.exe to launch Navit ---
-log "Waiting 30s for WM to boot and autorun.exe to launch Navit..."
+# --- Wait for WinCE shell to fully boot ---
+log "Waiting 30s for WinCE shell to boot..."
 sleep 30
 capture_screenshot "01-post-boot"
 
@@ -134,7 +138,53 @@ if ! kill -0 "$EMU_PID" 2>/dev/null; then
     exit 1
 fi
 
-capture_screenshot "02-navit-check"
+# --- Hot-plug shared folder via File > Configure dialog ---
+# This simulates inserting an SD card after boot, which triggers
+# SHGetAutoRunPath() -> \Storage Card\2577\autorun.exe -> navit.exe
+log "Hot-plugging shared folder via File > Configure..."
+EMU_WID="$(xdotool search --name 'Device Emulator' 2>/dev/null | head -1 || true)"
+if [ -z "$EMU_WID" ]; then
+    log "WARNING: Could not find Device Emulator window for hot-plug"
+else
+    # Focus the emulator window and open File > Configure
+    xdotool windowactivate --sync "$EMU_WID"
+    sleep 1
+    xdotool key alt+f
+    sleep 1
+    capture_screenshot "02-file-menu"
+
+    # Click "Configure..." menu item (send 'c' key as accelerator)
+    xdotool key c
+    sleep 2
+    capture_screenshot "03-configure-dialog"
+
+    # The General tab should be active by default.
+    # The Shared folder field is the last text input on the General tab.
+    # Tab through the dialog fields to reach it, then type the path.
+    # Fields: ROM image, ROM address, RAM size, Flash file, Host key, FuncKey, Shared folder
+    for i in $(seq 1 12); do
+        xdotool key Tab
+        sleep 0.2
+    done
+    sleep 0.5
+
+    # Type the Windows path to the shared folder
+    xdotool type --delay 50 "$SHARE_WIN"
+    sleep 1
+    capture_screenshot "04-shared-folder-set"
+
+    # Press Enter to confirm (OK button)
+    xdotool key Return
+    sleep 2
+    capture_screenshot "05-after-hotplug"
+
+    log "Shared folder hot-plug attempted: $SHARE_WIN"
+fi
+
+# --- Wait for autorun to trigger ---
+log "Waiting 15s for autorun.exe to launch Navit..."
+sleep 15
+capture_screenshot "06-navit-check"
 
 # --- Monitor for remaining time ---
 REMAINING=$((SMOKE_TIMEOUT - (SECONDS - START)))
