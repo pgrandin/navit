@@ -174,22 +174,35 @@ else
     sleep 0.5
     import -window root "$RESULTS_DIR/03-reset-hover-$(date '+%H%M%S').png" 2>/dev/null || true
 
-    # The submenu should appear to the right. Click "Soft" (first item).
-    SUBMENU_X=$((MENU_X + 100))
-    SUBMENU_Y=$((MENU_Y))
-    log "Clicking Soft Reset at absolute ($SUBMENU_X, $SUBMENU_Y)"
-    xdotool mousemove "$SUBMENU_X" "$SUBMENU_Y"
+    # The submenu appears to the right of "Reset" with "Soft" as the first item.
+    # From screenshots: the submenu "Soft" is at roughly window-relative (155, 60).
+    # Move slowly rightward to keep the submenu open, then click "Soft".
+    xdotool mousemove --window "$EMU_WID" 100 60
     sleep 0.3
+    xdotool mousemove --window "$EMU_WID" 140 60
+    sleep 0.3
+    xdotool mousemove --window "$EMU_WID" 165 60
+    sleep 0.3
+    import -window root "$RESULTS_DIR/04-submenu-hover-$(date '+%H%M%S').png" 2>/dev/null || true
     xdotool click 1
     sleep 2
-    import -window root "$RESULTS_DIR/04-after-reset-$(date '+%H%M%S').png" 2>/dev/null || true
-    log "Soft reset triggered"
+    import -window root "$RESULTS_DIR/05-after-reset-click-$(date '+%H%M%S').png" 2>/dev/null || true
+    log "Soft reset click attempted"
+
+    # Wait for the emulator to re-detect the window after reset
+    sleep 5
+    EMU_WID2="$(xdotool search --name 'Device Emulator' 2>/dev/null | head -1 || true)"
+    if [ -n "$EMU_WID2" ]; then
+        log "Emulator window after reset: $EMU_WID2"
+    else
+        log "WARNING: Emulator window not found after reset"
+    fi
 fi
 
 # --- Wait for second boot + autorun ---
 log "Waiting 30s for WinCE to reboot and autorun.exe to launch Navit..."
 sleep 30
-capture_screenshot "05-post-reset"
+capture_screenshot "06-post-reset"
 
 # --- Monitor for remaining time ---
 REMAINING=$((SMOKE_TIMEOUT - (SECONDS - START)))
