@@ -186,75 +186,99 @@ emu_click 50 170
 sleep 3
 capture_screenshot "03-programs-tapped"
 
-# Step 3: Tap File Explorer in the Programs grid
+# Step 3: Double-tap File Explorer in the Programs grid
 # From screenshot analysis of the Programs screen:
-#   Grid layout (3 columns x 4 rows visible):
-#     Row 1 (y~90):  Games(x~40), ActiveSync(x~120), Calculator(x~190)
-#     Row 2 (y~160): File Explorer(x~40), Getting Started(x~120), Internet Sharing(x~190)
-#     Row 3 (y~230): Messenger(x~40), Notes(x~120), Pictures & Videos(x~190)
-#     Row 4 (y~300): Search(x~40), SimTkUI(x~120), Task Manager(x~190)
-log "Step 3: Tapping File Explorer..."
-emu_click 40 160
+#   Grid layout (3 columns x 4 rows):
+#     Row 1 (icon y~65, label y~85): Games(x~40), ActiveSync(x~120), Calculator(x~190)
+#     Row 2 (icon y~140, label y~162): File Explorer(x~40), Getting Started(x~120), Internet Sharing(x~190)
+#     Row 3 (icon y~210): Messenger(x~40), Notes(x~120), Pictures & Videos(x~190)
+#     Row 4 (icon y~280): Search(x~40), SimTkUI(x~120), Task Manager(x~190)
+# Single tap selects, double-tap opens.
+log "Step 3: Double-tapping File Explorer icon..."
+emu_dblclick 40 145
 sleep 3
-capture_screenshot "04-file-explorer"
+capture_screenshot "04-after-file-explorer-dblclick"
 
-# Step 4: In File Explorer, navigate to Storage Card
-# File Explorer shows the \My Device root with items like:
-#   My Documents, Program Files, Storage Card, Temp, Windows, etc.
-# Items are in a list view. "Storage Card" should be visible.
-# List items start around y=35 with ~20px spacing.
-log "Step 4: Looking for Storage Card in File Explorer..."
-capture_screenshot "05-file-explorer-view"
+# Check if we got File Explorer or are still on Programs
+# If still on Programs, try clicking the File Explorer text label
+log "Step 3b: Trying File Explorer label area..."
+emu_dblclick 40 165
+sleep 3
+capture_screenshot "05-after-label-dblclick"
 
-# Scroll down if needed and try tapping "Storage Card"
-# It's typically several items down in the list
-# Try tapping items from top to bottom until we find it
-emu_click 120 80
-sleep 2
-capture_screenshot "06a-fe-item1"
+# Step 4: Navigate File Explorer to Storage Card
+# File Explorer shows \My Device root. Items in list view with ~20px rows.
+# Typical items: My Documents, Program Files, Storage Card, Temp, Windows
+# "Storage Card" is the shared folder from /sharedfolder flag.
+log "Step 4: Navigating to Storage Card..."
+capture_screenshot "06-current-view"
 
-emu_click 120 100
-sleep 2
-capture_screenshot "06b-fe-item2"
+# Tap through the list looking for Storage Card
+# In File Explorer list, folders appear with folder icons, ~20px spacing
+# starting around y=35 below the address bar
+emu_click 120 55
+sleep 1
+capture_screenshot "06a-item1"
 
-emu_click 120 120
-sleep 2
-capture_screenshot "06c-fe-item3"
+emu_click 120 75
+sleep 1
+capture_screenshot "06b-item2"
 
-emu_click 120 140
-sleep 2
-capture_screenshot "06d-fe-item4"
+emu_click 120 95
+sleep 1
+capture_screenshot "06c-item3"
 
-emu_click 120 160
-sleep 2
-capture_screenshot "06e-fe-item5"
+emu_click 120 115
+sleep 1
+capture_screenshot "06d-item4"
 
-# Step 5: In Storage Card folder, find and tap navit.exe
+emu_click 120 135
+sleep 1
+capture_screenshot "06e-item5"
+
+emu_click 120 155
+sleep 1
+capture_screenshot "06f-item6"
+
+emu_click 120 175
+sleep 1
+capture_screenshot "06g-item7"
+
+# Step 5: Find and tap navit.exe in Storage Card
 log "Step 5: Looking for navit.exe..."
-capture_screenshot "07-storage-card-contents"
+capture_screenshot "07-looking-for-navit"
 
-# navit.exe should be one of the items in the folder
-# The build produces: navit.exe, navit.xml, icons/, locale/, espeak-data/, maps/
-emu_click 120 60
-sleep 2
-capture_screenshot "08a-item1"
+# The shared folder contains: espeak-data/, icons/, locale/, maps/,
+# navit.exe, navit.xml, navit_layout_*.xml
+# navit.exe should be after the folders alphabetically
+emu_click 120 55
+sleep 1
+capture_screenshot "07a-try1"
 
-emu_click 120 80
-sleep 2
-capture_screenshot "08b-item2"
+emu_click 120 75
+sleep 1
+capture_screenshot "07b-try2"
 
-emu_click 120 100
-sleep 2
-capture_screenshot "08c-item3"
+emu_click 120 95
+sleep 1
+capture_screenshot "07c-try3"
 
-emu_click 120 120
-sleep 2
-capture_screenshot "08d-item4"
+emu_click 120 115
+sleep 1
+capture_screenshot "07d-try4"
+
+emu_click 120 135
+sleep 1
+capture_screenshot "07e-try5"
+
+emu_click 120 155
+sleep 1
+capture_screenshot "07f-try6"
 
 # Give Navit time to start and render
 log "Waiting 15s for Navit to initialize..."
 sleep 15
-capture_screenshot "09-navit-running"
+capture_screenshot "08-navit-result"
 
 # --- Monitor for remaining time ---
 REMAINING=$((SMOKE_TIMEOUT - (SECONDS - START)))
