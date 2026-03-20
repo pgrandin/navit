@@ -176,22 +176,24 @@ fi
 
 # Rotate screen if requested. Device Emulator doesn't support /rotate CLI flag.
 # Use the Wine menu bar: Flash > Rotate Right (each = 90 degrees clockwise).
-# Wine menu bar is at screen y≈12. "Flash" text center is at screen x≈50.
+# Window-relative coords: menu bar at y≈12, "Flash" at x≈50.
 if [ "$ROTATE" != "0" ]; then
     log "Rotating screen $ROTATE x 90 degrees via Flash menu..."
     for i in $(seq 1 "$ROTATE"); do
-        # Click "Flash" in the Wine menu bar (screen coords, not WM coords)
-        xdotool mousemove 50 12
+        # Click "Flash" in the Wine menu bar (window-relative coords)
+        xdotool mousemove --window "$WIN_ID" 50 12
         sleep 0.3
         xdotool mousedown 1; sleep 0.1; xdotool mouseup 1
         sleep 1
         capture_screenshot "00-flash-menu-$i"
-        # Click "Rotate Right" — first item or second item in dropdown
-        # Estimate dropdown item at ~screen(50, 30) for first item, (50, 45) for second
-        xdotool mousemove 80 45
+        # Click "Rotate Right" in the dropdown menu
+        # Dropdown items appear below the menu bar, ~18px each
+        # Try first few positions to find Rotate Right
+        xdotool mousemove --window "$WIN_ID" 80 30
         sleep 0.2
         xdotool mousedown 1; sleep 0.1; xdotool mouseup 1
         sleep 2
+        capture_screenshot "00-rotate-click-$i"
     done
     sleep 3
     capture_screenshot "00-after-rotate"
