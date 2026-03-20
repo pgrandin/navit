@@ -175,22 +175,33 @@ if [ -n "$WIN_ID" ]; then
 fi
 
 # Rotate screen if requested. Device Emulator doesn't support /rotate CLI flag.
-# Use the Wine menu bar: Flash > Rotate Right via keyboard navigation.
+# Keyboard goes to WM guest, so use click-drag on Wine menu bar instead.
+# Click Flash, hold, drag to dropdown item, release.
 if [ "$ROTATE" != "0" ]; then
     log "Rotating screen $ROTATE x 90 degrees via Flash menu..."
     for i in $(seq 1 "$ROTATE"); do
-        # Alt+L opens the "fLash" menu (Alt+F is File, Alt+H is Help)
-        xdotool key --window "$WIN_ID" alt+l 2>/dev/null || true
-        sleep 1
-        capture_screenshot "00-flash-menu-$i"
-        # Navigate dropdown with arrow keys and Enter
-        # Rotate Right should be one of the first items
-        xdotool key --window "$WIN_ID" Down 2>/dev/null || true
-        sleep 0.3
-        capture_screenshot "00-flash-item-$i"
-        xdotool key --window "$WIN_ID" Return 2>/dev/null || true
+        # Press-and-hold on "Flash" in Wine menu bar, drag to dropdown item
+        xdotool mousemove --window "$WIN_ID" 50 12
+        sleep 0.2
+        xdotool mousedown 1
+        sleep 0.5
+        capture_screenshot "00-flash-held-$i"
+        # Drag down to first dropdown item
+        xdotool mousemove --window "$WIN_ID" 50 28
+        sleep 0.5
+        capture_screenshot "00-flash-drag1-$i"
+        # Try second item
+        xdotool mousemove --window "$WIN_ID" 50 42
+        sleep 0.5
+        capture_screenshot "00-flash-drag2-$i"
+        # Try third item
+        xdotool mousemove --window "$WIN_ID" 50 56
+        sleep 0.5
+        capture_screenshot "00-flash-drag3-$i"
+        # Release on whichever item we're on - we'll check screenshots
+        xdotool mouseup 1
         sleep 2
-        capture_screenshot "00-rotate-click-$i"
+        capture_screenshot "00-rotate-result-$i"
     done
     sleep 3
     capture_screenshot "00-after-rotate"
