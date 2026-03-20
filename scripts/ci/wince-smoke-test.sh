@@ -60,13 +60,13 @@ log "DeviceEmulator.exe: $(du -h "$EMU_DIR/DeviceEmulator.exe" | cut -f1)"
 log "rom.bin: $(du -h "$EMU_DIR/rom.bin" | cut -f1)"
 log "Navit package: $(find "$NAVIT_DIR" -type f | wc -l) files"
 
-# --- Auto-start: place navit.exe as autorun.exe on the Storage Card ---
-# WinCE auto-runs \Storage Card\2577\autorun.exe (2577 = ARM ARMV4I processor type)
-# when a storage card is detected. Also place in root as fallback.
-mkdir -p "$NAVIT_DIR/2577"
-cp "$NAVIT_DIR/navit.exe" "$NAVIT_DIR/2577/autorun.exe"
-cp "$NAVIT_DIR/navit.exe" "$NAVIT_DIR/autorun.exe"
-log "Created 2577/autorun.exe and autorun.exe"
+# --- Auto-start setup ---
+# WinCE executes all .exe files in \Storage Card\StartUp\ at end of boot.
+# Since /sharedfolder maps to \Storage Card, we create StartUp/navit.exe.
+mkdir -p "$NAVIT_DIR/StartUp"
+# Create a .lnk shortcut (WinCE text format: <charcount>#<command>)
+printf '27#\\Storage Card\\navit.exe' > "$NAVIT_DIR/StartUp/navit.lnk"
+log "Created StartUp/navit.lnk for auto-launch"
 
 # --- Start Xvfb ---
 log "Starting Xvfb (rotate=$ROTATE)..."
