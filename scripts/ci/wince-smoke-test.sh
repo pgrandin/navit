@@ -94,12 +94,13 @@ log "Wine initialized"
 ROM_WIN="$(winepath -w "$(realpath "$EMU_DIR/rom.bin")")"
 SHARE_WIN="$(winepath -w "$(realpath "$NAVIT_DIR")")"
 
-# --- Launch Device Emulator (without shared folder) ---
-# Boot without /sharedfolder so we can hot-plug it later via the Configure
-# dialog, triggering a genuine SD card insertion event for autorun.exe.
-log "Launching Device Emulator (no shared folder)..."
+# --- Launch Device Emulator ---
+# Boot WITH /sharedfolder so the Storage Card is available.
+# After the shell boots, we soft-reset via File > Reset > Soft to trigger
+# the autorun.exe mechanism on the second boot cycle.
+log "Launching Device Emulator..."
 
-EMU_ARGS=("$ROM_WIN" /memsize 128)
+EMU_ARGS=("$ROM_WIN" /memsize 128 /sharedfolder "$SHARE_WIN")
 if [ "$ROTATE" = "1" ] || [ "$ROTATE" = "3" ]; then
     EMU_ARGS+=(/video 320x240x16)
 fi
@@ -138,97 +139,57 @@ if ! kill -0 "$EMU_PID" 2>/dev/null; then
     exit 1
 fi
 
-# --- Hot-plug shared folder via File > Configure dialog ---
-# This simulates inserting an SD card after boot, which triggers
-# SHGetAutoRunPath() -> \Storage Card\2577\autorun.exe -> navit.exe
-log "Hot-plugging shared folder via File > Configure..."
+# --- Soft-reset to trigger autorun.exe ---
+# The Storage Card (shared folder) is present from boot, but the WinCE shell
+# may not trigger SHGetAutoRunPath() for a card that was already mounted.
+# A soft reset re-initializes the shell while keeping the Storage Card mounted,
+# which should trigger autorun detection on the second boot.
+log "Performing soft reset via File > Reset > Soft..."
 EMU_WID="$(xdotool search --name 'Device Emulator' 2>/dev/null | head -1 || true)"
 if [ -z "$EMU_WID" ]; then
-    log "WARNING: Could not find Device Emulator window for hot-plug"
+    log "WARNING: Could not find Device Emulator window for soft reset"
 else
-    # Click "File" in the host menu bar using window-relative coordinates.
-    # The menu bar is rendered by Wine at the top of the window.
-    # "File" text is at approximately x=15, y=8 in the window.
     xdotool windowfocus "$EMU_WID" 2>/dev/null || true
     sleep 0.5
 
-    # Get window position for absolute coordinate calculation
+    # Get window geometry for menu coordinate calculation
     eval "$(xdotool getwindowgeometry --shell "$EMU_WID" 2>/dev/null)" || true
     log "Emulator window at X=$X Y=$Y W=${WIDTH:-?} H=${HEIGHT:-?}"
 
-    # Click on "File" menu text in the menu bar
+    # Click "File" in the host menu bar
     xdotool mousemove --window "$EMU_WID" 15 8
     sleep 0.3
     xdotool click --window "$EMU_WID" 1
     sleep 1
-    # Take a full-screen screenshot to see the menu dropdown
     import -window root "$RESULTS_DIR/02-file-menu-$(date '+%H%M%S').png" 2>/dev/null || true
-    log "Screenshot: 02-file-menu (root)"
 
-    # "Configure..." is the 4th item in the File dropdown menu:
+    # Click "Reset >" submenu (3rd item in File dropdown)
     #   Save State and Exit  (~16px)
     #   Clear Saved State    (~16px)
-    #   Reset >              (~16px)
-    #   Configure...         (~16px)  <-- target
-    #   Exit                 (~16px)
-    # The dropdown appears below the menu bar (19px tall).
-    # Each item is ~16px. Configure starts at offset ~67px from window top.
+    #   Reset >              (~16px)  <-- target
     MENU_X=$((X + 30))
-    MENU_Y=$((Y + 19 + 16*3 + 8))
-    log "Clicking Configure at absolute ($MENU_X, $MENU_Y)"
+    MENU_Y=$((Y + 19 + 16*2 + 8))
+    log "Clicking Reset at absolute ($MENU_X, $MENU_Y)"
     xdotool mousemove "$MENU_X" "$MENU_Y"
+    sleep 0.5
+    import -window root "$RESULTS_DIR/03-reset-hover-$(date '+%H%M%S').png" 2>/dev/null || true
+
+    # The submenu should appear to the right. Click "Soft" (first item).
+    SUBMENU_X=$((MENU_X + 100))
+    SUBMENU_Y=$((MENU_Y))
+    log "Clicking Soft Reset at absolute ($SUBMENU_X, $SUBMENU_Y)"
+    xdotool mousemove "$SUBMENU_X" "$SUBMENU_Y"
     sleep 0.3
     xdotool click 1
     sleep 2
-    import -window root "$RESULTS_DIR/03-after-menu-click-$(date '+%H%M%S').png" 2>/dev/null || true
-    log "Screenshot: 03-after-menu-click (root)"
-
-    # Search for any new dialog window that appeared
-    CFG_WID=""
-    for title in "Emulator Properties" "Configure" "General"; do
-        CFG_WID="$(xdotool search --name "$title" 2>/dev/null | head -1 || true)"
-        [ -n "$CFG_WID" ] && break
-    done
-
-    if [ -n "$CFG_WID" ]; then
-        log "Configure dialog found: $CFG_WID"
-        import -window root "$RESULTS_DIR/04-configure-dialog-$(date '+%H%M%S').png" 2>/dev/null || true
-
-        # Tab through to the Shared folder field, then type the path
-        xdotool windowfocus "$CFG_WID" 2>/dev/null || true
-        sleep 0.5
-        for i in $(seq 1 12); do
-            xdotool key --window "$CFG_WID" Tab
-            sleep 0.2
-        done
-        sleep 0.5
-        xdotool type --window "$CFG_WID" --delay 50 "$SHARE_WIN"
-        sleep 1
-        import -window root "$RESULTS_DIR/05-shared-folder-set-$(date '+%H%M%S').png" 2>/dev/null || true
-
-        # Press Enter to confirm (OK button)
-        xdotool key --window "$CFG_WID" Return
-        sleep 2
-        log "Shared folder set via Configure dialog"
-    else
-        log "WARNING: Configure dialog not found. Trying keyboard shortcut approach..."
-        import -window root "$RESULTS_DIR/04-no-dialog-$(date '+%H%M%S').png" 2>/dev/null || true
-
-        # Fallback: try sending Alt+F,C via X keyboard events to the root
-        xdotool key alt+f
-        sleep 1
-        xdotool key c
-        sleep 2
-        import -window root "$RESULTS_DIR/05-fallback-$(date '+%H%M%S').png" 2>/dev/null || true
-    fi
-    capture_screenshot "06-after-hotplug"
-    log "Shared folder hot-plug attempted: $SHARE_WIN"
+    import -window root "$RESULTS_DIR/04-after-reset-$(date '+%H%M%S').png" 2>/dev/null || true
+    log "Soft reset triggered"
 fi
 
-# --- Wait for autorun to trigger ---
-log "Waiting 15s for autorun.exe to launch Navit..."
-sleep 15
-capture_screenshot "07-navit-check"
+# --- Wait for second boot + autorun ---
+log "Waiting 30s for WinCE to reboot and autorun.exe to launch Navit..."
+sleep 30
+capture_screenshot "05-post-reset"
 
 # --- Monitor for remaining time ---
 REMAINING=$((SMOKE_TIMEOUT - (SECONDS - START)))
