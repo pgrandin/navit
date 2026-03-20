@@ -192,9 +192,9 @@ if [ "$ROTATE" = "1" ] || [ "$ROTATE" = "3" ]; then
     sleep 3
     capture_screenshot "02-start-tapped"
 
-    # Step 2: Tap "Programs" (verified from landscape screenshot)
+    # Step 2: Tap "Programs" (WM(50,170) verified working in landscape v6 run)
     log "Step 2: Tapping Programs..."
-    emu_click 50 150
+    emu_click 50 170
     sleep 3
     capture_screenshot "03-programs-tapped"
 
