@@ -62,13 +62,13 @@ log "Navit package: $(find "$NAVIT_DIR" -type f | wc -l) files"
 
 # --- Auto-start setup ---
 # Place autorun.exe in the ARM processor-specific subfolder (2577 = ARMV4I).
-# WinCE shell calls SHGetAutoRunPath() when a storage card is inserted and
+# WinCE shell calls SHGetAutoRunPath() when a storage card is INSERTED and
 # runs \Storage Card\<procID>\autorun.exe automatically.
-# We boot WITHOUT /sharedfolder and hot-plug it later via the Device Emulator's
-# File > Configure dialog so the shell sees a genuine card-insertion event.
+# We also place a copy at the root for ROMs that check there instead.
 mkdir -p "$NAVIT_DIR/2577"
 cp "$NAVIT_DIR/navit.exe" "$NAVIT_DIR/2577/autorun.exe"
-log "Created 2577/autorun.exe for SD card autorun"
+cp "$NAVIT_DIR/navit.exe" "$NAVIT_DIR/autorun.exe"
+log "Created autorun.exe at root and 2577/ for SD card autorun"
 
 # --- Start Xvfb ---
 log "Starting Xvfb (rotate=$ROTATE)..."
@@ -95,12 +95,12 @@ ROM_WIN="$(winepath -w "$(realpath "$EMU_DIR/rom.bin")")"
 SHARE_WIN="$(winepath -w "$(realpath "$NAVIT_DIR")")"
 
 # --- Launch Device Emulator ---
-# Boot WITH /sharedfolder so the Storage Card is available.
-# After the shell boots, we soft-reset via File > Reset > Soft to trigger
-# the autorun.exe mechanism on the second boot cycle.
-log "Launching Device Emulator..."
+# Boot WITHOUT /sharedfolder so we can hot-plug it later.
+# Hot-plugging triggers a genuine storage card insertion event in WinCE,
+# which causes the shell to detect and run autorun.exe.
+log "Launching Device Emulator (without shared folder)..."
 
-EMU_ARGS=("$ROM_WIN" /memsize 128 /sharedfolder "$SHARE_WIN")
+EMU_ARGS=("$ROM_WIN" /memsize 128)
 if [ "$ROTATE" = "1" ] || [ "$ROTATE" = "3" ]; then
     EMU_ARGS+=(/video 320x240x16)
 fi
@@ -139,15 +139,14 @@ if ! kill -0 "$EMU_PID" 2>/dev/null; then
     exit 1
 fi
 
-# --- Soft-reset to trigger autorun.exe ---
-# The Storage Card (shared folder) is present from boot, but the WinCE shell
-# may not trigger SHGetAutoRunPath() for a card that was already mounted.
-# A soft reset re-initializes the shell while keeping the Storage Card mounted,
-# which should trigger autorun detection on the second boot.
-log "Performing soft reset via File > Reset > Soft..."
+# --- Hot-plug storage card via File > Configure ---
+# Open the Device Emulator's Configure dialog and set the shared folder.
+# This triggers a genuine storage card insertion event in WinCE,
+# which causes the shell to execute autorun.exe → launches Navit.
+log "Hot-plugging storage card via File > Configure..."
 EMU_WID="$(xdotool search --name 'Device Emulator' 2>/dev/null | head -1 || true)"
 if [ -z "$EMU_WID" ]; then
-    log "WARNING: Could not find Device Emulator window for soft reset"
+    log "WARNING: Could not find Device Emulator window for hot-plug"
 else
     xdotool windowfocus "$EMU_WID" 2>/dev/null || true
     sleep 0.5
@@ -163,64 +162,106 @@ else
     sleep 1
     import -window root "$RESULTS_DIR/02-file-menu-$(date '+%H%M%S').png" 2>/dev/null || true
 
-    # Click "Reset >" submenu (3rd item in File dropdown)
-    #   Save State and Exit  (~16px)
-    #   Clear Saved State    (~16px)
-    #   Reset >              (~16px)  <-- target
-    MENU_X=$((X + 30))
-    MENU_Y=$((Y + 19 + 16*2 + 8))
-    log "Clicking Reset at absolute ($MENU_X, $MENU_Y)"
-    xdotool mousemove "$MENU_X" "$MENU_Y"
+    # Click "Configure..." (4th item in File dropdown)
+    #   Save State and Exit  (~18px)
+    #   Clear Saved State    (~18px)
+    #   Reset >              (~18px)
+    #   Configure...         (~18px)  <-- target
+    #   Exit
+    CONF_X=$((X + 50))
+    CONF_Y=$((Y + 19 + 18*3 + 9))
+    log "Clicking Configure at absolute ($CONF_X, $CONF_Y)"
+    xdotool mousemove "$CONF_X" "$CONF_Y"
     sleep 0.5
-    import -window root "$RESULTS_DIR/03-reset-hover-$(date '+%H%M%S').png" 2>/dev/null || true
-
-    # The submenu appears to the right of "Reset" with "Soft" as the first item.
-    # From screenshots: the submenu "Soft" is at roughly window-relative (155, 60).
-    # Move slowly rightward to keep the submenu open, then click "Soft".
-    xdotool mousemove --window "$EMU_WID" 100 60
-    sleep 0.3
-    xdotool mousemove --window "$EMU_WID" 140 60
-    sleep 0.3
-    xdotool mousemove --window "$EMU_WID" 165 60
-    sleep 0.3
-    import -window root "$RESULTS_DIR/04-submenu-hover-$(date '+%H%M%S').png" 2>/dev/null || true
+    import -window root "$RESULTS_DIR/03-configure-hover-$(date '+%H%M%S').png" 2>/dev/null || true
     xdotool click 1
     sleep 2
-    import -window root "$RESULTS_DIR/05-after-soft-click-$(date '+%H%M%S').png" 2>/dev/null || true
+    import -window root "$RESULTS_DIR/04-configure-dialog-$(date '+%H%M%S').png" 2>/dev/null || true
 
-    # A confirmation dialog appears: "Are you sure you want to reset the guest OS?"
-    # with Yes and No buttons. Click "Yes" with mouse coordinates.
-    # From screenshots: Yes button is at approximately (140, 305) in root window.
-    # The dialog is rendered inside the emulator window area.
-    sleep 1
-    import -window root "$RESULTS_DIR/06-confirm-dialog-$(date '+%H%M%S').png" 2>/dev/null || true
+    # The Configure dialog should now be open.
+    # We need to find and fill the "Shared Folder" field.
+    # Look for the Configure dialog window.
+    CONF_WID="$(xdotool search --name 'Emulator Properties' 2>/dev/null | head -1 || true)"
+    if [ -z "$CONF_WID" ]; then
+        CONF_WID="$(xdotool search --name 'Configure' 2>/dev/null | head -1 || true)"
+    fi
+    if [ -z "$CONF_WID" ]; then
+        CONF_WID="$(xdotool getactivewindow 2>/dev/null || true)"
+    fi
+    log "Configure dialog window: ${CONF_WID:-not found}"
 
-    # Click "Yes" button — it's at roughly window-relative (75, 275) based on
-    # the dialog being centered in the 240-wide emulator window
-    YES_X=$((X + 75))
-    YES_Y=$((Y + 275))
-    log "Clicking Yes at absolute ($YES_X, $YES_Y)"
-    xdotool mousemove "$YES_X" "$YES_Y"
-    sleep 0.3
-    xdotool click 1
-    sleep 1
-    import -window root "$RESULTS_DIR/07-after-confirm-$(date '+%H%M%S').png" 2>/dev/null || true
-    log "Soft reset confirmed"
+    if [ -n "$CONF_WID" ]; then
+        # Take a screenshot of the dialog window itself
+        import -window "$CONF_WID" "$RESULTS_DIR/05-configure-window-$(date '+%H%M%S').png" 2>/dev/null || true
 
-    # Wait for the emulator to reboot
-    sleep 5
-    EMU_WID2="$(xdotool search --name 'Device Emulator' 2>/dev/null | head -1 || true)"
-    if [ -n "$EMU_WID2" ]; then
-        log "Emulator window after reset: $EMU_WID2"
+        # Try to find the shared folder field.
+        # In the Device Emulator Properties dialog, there's typically a
+        # "Shared Folder" text field. Try using Tab to navigate to it.
+        # The dialog may have multiple tabs and fields.
+        # Strategy: use xdotool to type the shared folder path into the
+        # field. We'll try Alt+keyboard shortcuts first.
+
+        # First, let's see if there's a "General" or "Peripherals" tab
+        # with the shared folder. Take a screenshot of the dialog first.
+        xdotool windowfocus "$CONF_WID" 2>/dev/null || true
+        sleep 0.5
+
+        # Try clicking on "General" tab if it exists (usually first tab, top-left)
+        # Tab headers are typically at the top of the dialog
+        # Try clicking at various positions to find the shared folder field
+
+        # Get configure dialog geometry
+        eval "$(xdotool getwindowgeometry --shell "$CONF_WID" 2>/dev/null)" || {
+            log "Could not get Configure dialog geometry"
+        }
+        log "Configure dialog at X=$X Y=$Y W=${WIDTH:-?} H=${HEIGHT:-?}"
+
+        # The shared folder field is likely a text input near the bottom of
+        # the General tab. Try clearing any existing value and typing our path.
+        # Use Ctrl+A to select all text in a field, then type the new path.
+
+        # Navigate through the dialog controls with Tab
+        # Try tabbing through and typing at each position,
+        # taking screenshots to see where we are
+        for tab_count in 1 2 3 4 5 6 7 8; do
+            xdotool key Tab
+            sleep 0.2
+        done
+        import -window root "$RESULTS_DIR/06-after-tabs-$(date '+%H%M%S').png" 2>/dev/null || true
+
+        # Try typing the shared folder path
+        # First select all text in the current field
+        xdotool key ctrl+a
+        sleep 0.2
+        xdotool type --clearmodifiers "$SHARE_WIN"
+        sleep 0.5
+        import -window root "$RESULTS_DIR/07-after-type-$(date '+%H%M%S').png" 2>/dev/null || true
+
+        # Click OK to apply (typically bottom-right of dialog)
+        # OK button is usually at the bottom of the dialog
+        if [ -n "${WIDTH:-}" ] && [ -n "${HEIGHT:-}" ]; then
+            OK_X=$((X + WIDTH - 170))
+            OK_Y=$((Y + HEIGHT - 15))
+            log "Clicking OK at absolute ($OK_X, $OK_Y)"
+            xdotool mousemove "$OK_X" "$OK_Y"
+            sleep 0.3
+            xdotool click 1
+        else
+            # Fallback: press Enter for OK
+            xdotool key Return
+        fi
+        sleep 2
+        import -window root "$RESULTS_DIR/08-after-ok-$(date '+%H%M%S').png" 2>/dev/null || true
+        log "Configure dialog closed"
     else
-        log "WARNING: Emulator window not found after reset"
+        log "WARNING: Could not find Configure dialog window"
     fi
 fi
 
-# --- Wait for second boot + autorun ---
-log "Waiting 30s for WinCE to reboot and autorun.exe to launch Navit..."
+# --- Wait for Navit to launch via autorun ---
+log "Waiting 30s for autorun.exe to detect storage card and launch Navit..."
 sleep 30
-capture_screenshot "08-post-reset"
+capture_screenshot "09-post-hotplug"
 
 # --- Monitor for remaining time ---
 REMAINING=$((SMOKE_TIMEOUT - (SECONDS - START)))
