@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# WinCE Smoke Test: Boot Device Emulator under Wine+Xvfb, auto-launch Navit, verify startup.
+# WinCE Smoke Test: Boot Device Emulator under Wine+Xvfb, launch Navit, verify startup.
 #
 # Expects:
 #   emulator/DeviceEmulator.exe  — from wince-setup-emulator.sh
@@ -44,6 +44,20 @@ capture_screenshot() {
     fi
 }
 
+# Tap a point on the WinCE guest screen.
+# Guest coordinates are relative to the WinCE display area,
+# which starts below the host menu bar (~19px).
+MENU_BAR_H=19
+tap_guest() {
+    local gx="$1" gy="$2" label="${3:-}"
+    local wx=$gx
+    local wy=$((gy + MENU_BAR_H))
+    [ -n "$label" ] && log "Tap ($gx,$gy) [${label}]"
+    xdotool mousemove --window "$EMU_WID" "$wx" "$wy"
+    sleep 0.3
+    xdotool click --window "$EMU_WID" 1
+}
+
 cleanup() {
     log "Cleaning up..."
     [ -n "${EMU_PID:-}" ] && kill "$EMU_PID" 2>/dev/null && sleep 1 && kill -9 "$EMU_PID" 2>/dev/null || true
@@ -59,16 +73,6 @@ trap cleanup EXIT
 log "DeviceEmulator.exe: $(du -h "$EMU_DIR/DeviceEmulator.exe" | cut -f1)"
 log "rom.bin: $(du -h "$EMU_DIR/rom.bin" | cut -f1)"
 log "Navit package: $(find "$NAVIT_DIR" -type f | wc -l) files"
-
-# --- Auto-start setup ---
-# Place autorun.exe in the ARM processor-specific subfolder (2577 = ARMV4I).
-# WinCE shell calls SHGetAutoRunPath() when a storage card is INSERTED and
-# runs \Storage Card\<procID>\autorun.exe automatically.
-# We also place a copy at the root for ROMs that check there instead.
-mkdir -p "$NAVIT_DIR/2577"
-cp "$NAVIT_DIR/navit.exe" "$NAVIT_DIR/2577/autorun.exe"
-cp "$NAVIT_DIR/navit.exe" "$NAVIT_DIR/autorun.exe"
-log "Created autorun.exe at root and 2577/ for SD card autorun"
 
 # --- Start Xvfb ---
 log "Starting Xvfb (rotate=$ROTATE)..."
@@ -95,12 +99,9 @@ ROM_WIN="$(winepath -w "$(realpath "$EMU_DIR/rom.bin")")"
 SHARE_WIN="$(winepath -w "$(realpath "$NAVIT_DIR")")"
 
 # --- Launch Device Emulator ---
-# Boot WITHOUT /sharedfolder so we can hot-plug it later.
-# Hot-plugging triggers a genuine storage card insertion event in WinCE,
-# which causes the shell to detect and run autorun.exe.
-log "Launching Device Emulator (without shared folder)..."
+log "Launching Device Emulator..."
 
-EMU_ARGS=("$ROM_WIN" /memsize 128)
+EMU_ARGS=("$ROM_WIN" /memsize 128 /sharedfolder "$SHARE_WIN")
 if [ "$ROTATE" = "1" ] || [ "$ROTATE" = "3" ]; then
     EMU_ARGS+=(/video 320x240x16)
 fi
@@ -129,6 +130,8 @@ for i in $(seq 1 30); do
     sleep 2
 done
 
+EMU_WID="$(xdotool search --name 'Device Emulator' 2>/dev/null | head -1 || true)"
+
 # --- Wait for WinCE shell to fully boot ---
 log "Waiting 30s for WinCE shell to boot..."
 sleep 30
@@ -139,129 +142,80 @@ if ! kill -0 "$EMU_PID" 2>/dev/null; then
     exit 1
 fi
 
-# --- Hot-plug storage card via File > Configure ---
-# Open the Device Emulator's Configure dialog and set the shared folder.
-# This triggers a genuine storage card insertion event in WinCE,
-# which causes the shell to execute autorun.exe → launches Navit.
-log "Hot-plugging storage card via File > Configure..."
-EMU_WID="$(xdotool search --name 'Device Emulator' 2>/dev/null | head -1 || true)"
+# --- Launch Navit via WinCE File Explorer ---
+# Navigate the WinCE GUI: Start > Programs > File Explorer > Storage Card > navit.exe
+# All coordinates are in WinCE guest screen space (240x320 portrait, 320x240 landscape).
+log "Navigating WinCE GUI to launch navit.exe..."
+
 if [ -z "$EMU_WID" ]; then
-    log "WARNING: Could not find Device Emulator window for hot-plug"
+    log "WARNING: Could not find Device Emulator window"
 else
     xdotool windowfocus "$EMU_WID" 2>/dev/null || true
     sleep 0.5
 
-    # Get window geometry for menu coordinate calculation
-    eval "$(xdotool getwindowgeometry --shell "$EMU_WID" 2>/dev/null)" || true
-    log "Emulator window at X=$X Y=$Y W=${WIDTH:-?} H=${HEIGHT:-?}"
-
-    # Click "File" in the host menu bar
-    xdotool mousemove --window "$EMU_WID" 15 8
-    sleep 0.3
-    xdotool click --window "$EMU_WID" 1
+    # Dismiss any "Device unlocked" notification by tapping the main area
+    tap_guest 120 160 "dismiss notifications"
     sleep 1
-    import -window root "$RESULTS_DIR/02-file-menu-$(date '+%H%M%S').png" 2>/dev/null || true
 
-    # Click "Configure..." (4th item in File dropdown)
-    #   Save State and Exit  (~18px)
-    #   Clear Saved State    (~18px)
-    #   Reset >              (~18px)
-    #   Configure...         (~18px)  <-- target
-    #   Exit
-    CONF_X=$((X + 50))
-    CONF_Y=$((Y + 19 + 18*3 + 9))
-    log "Clicking Configure at absolute ($CONF_X, $CONF_Y)"
-    xdotool mousemove "$CONF_X" "$CONF_Y"
-    sleep 0.5
-    import -window root "$RESULTS_DIR/03-configure-hover-$(date '+%H%M%S').png" 2>/dev/null || true
-    xdotool click 1
+    # Step 1: Tap "Start" at top-left of WinCE screen
+    # The Start button in PPC 2003 SE is in the top-left corner with a flag icon.
+    tap_guest 25 12 "Start button"
     sleep 2
-    import -window root "$RESULTS_DIR/04-configure-dialog-$(date '+%H%M%S').png" 2>/dev/null || true
+    capture_screenshot "02-start-menu"
 
-    # The Configure dialog should now be open.
-    # We need to find and fill the "Shared Folder" field.
-    # Look for the Configure dialog window.
-    CONF_WID="$(xdotool search --name 'Emulator Properties' 2>/dev/null | head -1 || true)"
-    if [ -z "$CONF_WID" ]; then
-        CONF_WID="$(xdotool search --name 'Configure' 2>/dev/null | head -1 || true)"
-    fi
-    if [ -z "$CONF_WID" ]; then
-        CONF_WID="$(xdotool getactivewindow 2>/dev/null || true)"
-    fi
-    log "Configure dialog window: ${CONF_WID:-not found}"
+    # Step 2: Tap "Programs" in the Start menu
+    # In PPC 2003 SE, the Start menu shows items vertically.
+    # "Programs" is typically near the bottom with a folder icon.
+    # The start menu occupies roughly the top 2/3 of the screen.
+    # Common items: Today, Calendar, Contacts, IE, Messaging, etc.
+    # Programs is usually the 7th-9th item.
+    # Each item is ~26px tall. Programs at roughly y=26*8+26 = 234
+    # But there's also a title area. Let's estimate y=260.
+    tap_guest 100 260 "Programs"
+    sleep 2
+    capture_screenshot "03-programs"
 
-    if [ -n "$CONF_WID" ]; then
-        # Take a screenshot of the dialog window itself
-        import -window "$CONF_WID" "$RESULTS_DIR/05-configure-window-$(date '+%H%M%S').png" 2>/dev/null || true
+    # Step 3: Tap "File Explorer" in the Programs screen
+    # The Programs screen shows icons in a grid layout.
+    # File Explorer typically has a folder icon with a magnifying glass.
+    # Icons are arranged in rows of ~4, with ~60px spacing.
+    # File Explorer is often in the first or second row.
+    # Let's try a few common positions.
+    # Row 1: y ≈ 55, icons at x ≈ 30, 90, 150, 210
+    # Row 2: y ≈ 115, icons at x ≈ 30, 90, 150, 210
+    tap_guest 40 55 "File Explorer (guess: row1, col1)"
+    sleep 2
+    capture_screenshot "04-after-programs-tap"
 
-        # Try to find the shared folder field.
-        # In the Device Emulator Properties dialog, there's typically a
-        # "Shared Folder" text field. Try using Tab to navigate to it.
-        # The dialog may have multiple tabs and fields.
-        # Strategy: use xdotool to type the shared folder path into the
-        # field. We'll try Alt+keyboard shortcuts first.
+    # Step 4: Look for Storage Card in File Explorer
+    # File Explorer shows a list of folders/files in My Device.
+    # Storage Card should be one of the items.
+    # The file list starts below the address bar (~40px from top).
+    # Items are ~20px tall in list view.
+    # Common items: My Documents, Program Files, Storage Card, Windows, etc.
+    # Storage Card might be the 3rd-5th item.
+    tap_guest 100 120 "Storage Card (guess)"
+    sleep 2
+    capture_screenshot "05-storage-card"
 
-        # First, let's see if there's a "General" or "Peripherals" tab
-        # with the shared folder. Take a screenshot of the dialog first.
-        xdotool windowfocus "$CONF_WID" 2>/dev/null || true
-        sleep 0.5
+    # Step 5: Find and tap navit.exe
+    # In Storage Card, navit.exe should be in the file list.
+    # But there are many files. It might be alphabetically sorted.
+    # navit.exe would be near the middle of an alphabetical list.
+    # Let's try tapping on the first visible .exe file.
+    tap_guest 100 80 "navit.exe (guess)"
+    sleep 3
+    capture_screenshot "06-navit-attempt"
 
-        # Try clicking on "General" tab if it exists (usually first tab, top-left)
-        # Tab headers are typically at the top of the dialog
-        # Try clicking at various positions to find the shared folder field
-
-        # Get configure dialog geometry
-        eval "$(xdotool getwindowgeometry --shell "$CONF_WID" 2>/dev/null)" || {
-            log "Could not get Configure dialog geometry"
-        }
-        log "Configure dialog at X=$X Y=$Y W=${WIDTH:-?} H=${HEIGHT:-?}"
-
-        # The shared folder field is likely a text input near the bottom of
-        # the General tab. Try clearing any existing value and typing our path.
-        # Use Ctrl+A to select all text in a field, then type the new path.
-
-        # Navigate through the dialog controls with Tab
-        # Try tabbing through and typing at each position,
-        # taking screenshots to see where we are
-        for tab_count in 1 2 3 4 5 6 7 8; do
-            xdotool key Tab
-            sleep 0.2
-        done
-        import -window root "$RESULTS_DIR/06-after-tabs-$(date '+%H%M%S').png" 2>/dev/null || true
-
-        # Try typing the shared folder path
-        # First select all text in the current field
-        xdotool key ctrl+a
-        sleep 0.2
-        xdotool type --clearmodifiers "$SHARE_WIN"
-        sleep 0.5
-        import -window root "$RESULTS_DIR/07-after-type-$(date '+%H%M%S').png" 2>/dev/null || true
-
-        # Click OK to apply (typically bottom-right of dialog)
-        # OK button is usually at the bottom of the dialog
-        if [ -n "${WIDTH:-}" ] && [ -n "${HEIGHT:-}" ]; then
-            OK_X=$((X + WIDTH - 170))
-            OK_Y=$((Y + HEIGHT - 15))
-            log "Clicking OK at absolute ($OK_X, $OK_Y)"
-            xdotool mousemove "$OK_X" "$OK_Y"
-            sleep 0.3
-            xdotool click 1
-        else
-            # Fallback: press Enter for OK
-            xdotool key Return
-        fi
-        sleep 2
-        import -window root "$RESULTS_DIR/08-after-ok-$(date '+%H%M%S').png" 2>/dev/null || true
-        log "Configure dialog closed"
-    else
-        log "WARNING: Could not find Configure dialog window"
-    fi
+    # Take a root screenshot to see the full state
+    import -window root "$RESULTS_DIR/07-root-state-$(date '+%H%M%S').png" 2>/dev/null || true
+    log "GUI navigation complete"
 fi
 
-# --- Wait for Navit to launch via autorun ---
-log "Waiting 30s for autorun.exe to detect storage card and launch Navit..."
-sleep 30
-capture_screenshot "09-post-hotplug"
+# --- Wait for Navit to potentially start ---
+log "Waiting 20s for Navit to initialize..."
+sleep 20
+capture_screenshot "08-after-wait"
 
 # --- Monitor for remaining time ---
 REMAINING=$((SMOKE_TIMEOUT - (SECONDS - START)))
