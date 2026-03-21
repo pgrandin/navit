@@ -50,20 +50,6 @@ emu_key() {
     sleep 0.3
 }
 
-# Tap a point on the WinCE guest screen.
-# Guest coordinates are relative to the WinCE display area,
-# which starts below the host menu bar (~19px).
-MENU_BAR_H=19
-tap_guest() {
-    local gx="$1" gy="$2" label="${3:-}"
-    local wx=$gx
-    local wy=$((gy + MENU_BAR_H))
-    [ -n "$label" ] && log "Tap ($gx,$gy) [${label}]"
-    xdotool mousemove --window "$EMU_WID" "$wx" "$wy"
-    sleep 0.3
-    xdotool click --window "$EMU_WID" 1
-}
-
 cleanup() {
     log "Cleaning up..."
     [ -n "${EMU_PID:-}" ] && kill "$EMU_PID" 2>/dev/null && sleep 1 && kill -9 "$EMU_PID" 2>/dev/null || true
@@ -150,8 +136,20 @@ fi
 
 # --- Launch Navit via WinCE File Explorer ---
 # Navigate: Start > Programs > File Explorer > Storage Card > navit.exe
-# Use keyboard navigation (arrow keys + Enter) which works regardless of
-# screen orientation, instead of fragile pixel-coordinate tapping.
+# Use keyboard navigation (Super, arrows, Enter).
+#
+# Start menu layout (from CI screenshots):
+#   Today, Office Mobile, Calendar, Contacts, Internet Explorer, Messaging,
+#   [Recent Programs header], Programs, Settings, Help
+#   → 6 Down presses to reach Programs
+#
+# Programs screen grid layout (4 columns):
+#   Row 1: Games | ActiveSync | Calculator | File Explorer
+#   Row 2: Getting Started | Internet Sharing | Messenger | Notes
+#   Row 3: Pictures & Videos | Search | SimTkUI | Task Manager
+#   Row 4: Tasks | Windows | Windows
+#   → Default selection: Games (row 1, col 1)
+#   → File Explorer: 3 Right presses
 log "Navigating WinCE GUI to launch navit.exe..."
 
 if [ -z "$EMU_WID" ]; then
@@ -160,108 +158,84 @@ else
     xdotool windowfocus "$EMU_WID" 2>/dev/null || true
     sleep 0.5
 
-    # Step 1: Open Start menu
-    # Try multiple approaches: F1 (left softkey = Start in PPC),
-    # Windows/Super key, and direct tap on Start button.
-    log "Step 1: Opening Start menu..."
-
-    # Try F1 first (left softkey, which is "Start" on Today screen)
-    emu_key F1
-    sleep 1
-    capture_screenshot "02-after-F1"
-
-    # Also try tapping the Start button area at the top-left
-    # The WinCE nav bar "Start" is at approximately guest (15, 5)
-    tap_guest 15 5 "Start button tap"
-    sleep 1
-    capture_screenshot "03-after-start-tap"
-
-    # Try Windows/Super key as another approach
+    # Step 1: Open Start menu with Super (Windows) key
+    log "Step 1: Opening Start menu (Super key)..."
     emu_key super
     sleep 1
-    capture_screenshot "04-after-super"
+    capture_screenshot "02-start-menu"
 
-    # Step 2: Navigate to Programs using keyboard
-    # PPC Start menu items (from landscape screenshot):
-    #   1. Today (selected by default)
-    #   2. Office Mobile
-    #   3. Calendar
-    #   4. Contacts
-    #   5. Internet Explorer
-    #   6. Messaging
-    #   7. Programs  <-- target (6 Down presses from Today)
+    # Step 2: Navigate to Programs (6x Down + Enter)
     log "Step 2: Navigating to Programs..."
     for i in 1 2 3 4 5 6; do
         emu_key Down
     done
     sleep 0.5
-    capture_screenshot "05-programs-highlight"
-
-    # Press Enter to open Programs
+    capture_screenshot "03-programs-highlight"
     emu_key Return
     sleep 2
-    capture_screenshot "06-programs-screen"
+    capture_screenshot "04-programs-screen"
 
-    # Step 3: Find and open File Explorer in Programs screen
-    # Programs screen shows a grid of program icons.
-    # We need to navigate to File Explorer.
-    # In PPC 2003 SE, Programs typically shows:
-    #   Row 1: Games, Calculator, ...
-    #   File Explorer might be in the list view.
-    # Try keyboard navigation: Tab/arrows to find File Explorer.
-    # First, let's just take a screenshot and see what we have.
-    # Try pressing Down a few times to find File Explorer.
-    log "Step 3: Looking for File Explorer..."
-
-    # In the Programs screen, items may be in a grid.
-    # Try navigating with arrow keys.
-    for i in 1 2 3; do
-        emu_key Down
-    done
+    # Step 3: Navigate to File Explorer (3x Right + Enter)
+    # Grid layout: Games is selected by default (row 1, col 1).
+    # File Explorer is at row 1, col 4 → 3 Right presses.
+    log "Step 3: Navigating to File Explorer..."
+    emu_key Right
+    emu_key Right
+    emu_key Right
     sleep 0.5
-    capture_screenshot "07-programs-nav"
-
-    # Try selecting the current item
+    capture_screenshot "05-file-explorer-highlight"
     emu_key Return
     sleep 2
-    capture_screenshot "08-after-programs-select"
+    capture_screenshot "06-file-explorer"
 
-    # Step 4: If we're in File Explorer, look for Storage Card
-    # If not, we need to adjust. Take screenshots to diagnose.
-    log "Step 4: Looking for Storage Card..."
-    # In File Explorer list view, navigate down to find Storage Card
-    for i in 1 2 3 4 5; do
-        emu_key Down
-    done
+    # Step 4: Navigate to Storage Card in File Explorer
+    # File Explorer opens showing "My Device" contents.
+    # Folders listed alphabetically: My Documents, Program Files,
+    # Storage Card, Temp, Windows, etc.
+    # "Storage Card" is typically the 3rd or 4th item.
+    # Navigate down and look for it.
+    log "Step 4: Navigating to Storage Card..."
+    # First item might be selected or we might need to move into the list.
+    # Try Down a few times to reach Storage Card.
+    emu_key Down
+    emu_key Down
+    emu_key Down
     sleep 0.5
-    capture_screenshot "09-file-list"
-
-    # Open selected item
+    capture_screenshot "07-storage-card-highlight"
     emu_key Return
     sleep 2
-    capture_screenshot "10-after-open"
+    capture_screenshot "08-storage-card-contents"
 
-    # Step 5: Look for navit.exe in Storage Card
+    # Step 5: Find and open navit.exe in Storage Card
+    # The Storage Card contains navit package files.
+    # Folders come first (2577, espeak-data, icons, locale, maps),
+    # then files alphabetically.
+    # navit.exe is in the file list after the folders.
+    # Need to navigate past folders to find navit.exe.
     log "Step 5: Looking for navit.exe..."
-    # Navigate through file list
-    for i in 1 2 3; do
+    # Navigate down through the file list.
+    # Folders: 2577, espeak-data, icons, locale, maps = 5 folders
+    # Then files: autorun.exe, navit.exe, navit.xml, ...
+    # navit.exe should be ~7 items down (5 folders + autorun.exe + navit.exe)
+    for i in 1 2 3 4 5 6 7; do
         emu_key Down
     done
     sleep 0.5
+    capture_screenshot "09-navit-highlight"
 
     # Open navit.exe
     emu_key Return
-    sleep 3
-    capture_screenshot "11-navit-attempt"
+    sleep 5
+    capture_screenshot "10-navit-launched"
 
-    import -window root "$RESULTS_DIR/12-root-state-$(date '+%H%M%S').png" 2>/dev/null || true
+    import -window root "$RESULTS_DIR/11-root-state-$(date '+%H%M%S').png" 2>/dev/null || true
     log "GUI navigation complete"
 fi
 
 # --- Wait for Navit to potentially start ---
 log "Waiting 20s for Navit to initialize..."
 sleep 20
-capture_screenshot "13-after-wait"
+capture_screenshot "12-after-wait"
 
 # --- Monitor for remaining time ---
 REMAINING=$((SMOKE_TIMEOUT - (SECONDS - START)))
