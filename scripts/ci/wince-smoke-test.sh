@@ -50,17 +50,6 @@ emu_key() {
     sleep 0.3
 }
 
-# Tap a point on the WinCE guest screen (guest coords).
-# The WinCE display starts below the host menu bar (~19px).
-MENU_BAR_H=19
-tap_guest() {
-    local gx="$1" gy="$2" label="${3:-}"
-    [ -n "$label" ] && log "Tap ($gx,$gy) [${label}]"
-    xdotool mousemove --window "$EMU_WID" "$gx" "$((gy + MENU_BAR_H))"
-    sleep 0.3
-    xdotool click --window "$EMU_WID" 1
-}
-
 cleanup() {
     log "Cleaning up..."
     [ -n "${EMU_PID:-}" ] && kill "$EMU_PID" 2>/dev/null && sleep 1 && kill -9 "$EMU_PID" 2>/dev/null || true
@@ -148,19 +137,16 @@ fi
 # --- Launch Navit via WinCE File Explorer ---
 # Navigate: Start > Programs > File Explorer > [root] > Storage Card > navit.exe
 #
-# Confirmed from CI screenshots:
-#
-# Start menu items (Super key opens it):
-#   Today, Office Mobile, Calendar, Contacts, Internet Explorer, Messaging,
-#   [Recent Programs header], Programs, Settings, Help
-#
-# Programs grid (4 columns):
-#   Row 1: Games | ActiveSync | Calculator | File Explorer
-#
-# My Device root folders (F1 = Up from My Documents):
-#   Application Data, ConnMgr, Documents and Settings, MUSIC,
-#   My Documents, Program Files, Storage Card, Temp, Windows
-#   → Storage Card is the 7th item (6 Down from Application Data)
+# All navigation uses keyboard (Super, arrows, Enter, F1).
+# Confirmed from CI:
+#   - Super opens Start menu
+#   - In landscape: 6 Down reaches Programs (Today is pre-selected)
+#   - In portrait: may need 7 Down (if nothing is pre-selected)
+#   - Enter opens the selected item
+#   - Programs grid: 3 Right from Games reaches File Explorer
+#   - F1 in File Explorer = "Up" (goes from My Documents to My Device root)
+#   - My Device root has 9 folders; Storage Card is 7th (6 Down)
+
 log "Navigating WinCE GUI to launch navit.exe..."
 
 if [ -z "$EMU_WID" ]; then
@@ -169,89 +155,102 @@ else
     xdotool windowfocus "$EMU_WID" 2>/dev/null || true
     sleep 0.5
 
-    # Step 1: Open Start menu with Super key
-    log "Step 1: Opening Start menu..."
+    # Step 1: Open Start menu
+    log "Step 1: Opening Start menu (Super key)..."
     emu_key super
     sleep 1
     capture_screenshot "02-start-menu"
 
-    # Step 2: Tap "Programs" in the Start menu
-    # Use direct tap coordinates instead of arrow keys (more reliable).
-    # From CI screenshots:
-    #   Landscape (320x240): Programs at approx guest (70, 168)
-    #   Portrait (240x320): Programs at approx guest (70, 218)
-    log "Step 2: Tapping Programs..."
+    # Step 2: Navigate to Programs
+    # Landscape: Today is pre-selected → 6 Down reaches Programs
+    # Portrait: might not have pre-selection → 7 Down as fallback
+    # Use 7 Down for safety (if already on Programs, one extra Down goes to Settings,
+    # but we then press Up once to compensate).
+    # Actually: use different counts per orientation.
     if [ "$ROTATE" = "1" ] || [ "$ROTATE" = "3" ]; then
-        tap_guest 70 168 "Programs (landscape)"
+        log "Step 2: Navigating to Programs (landscape: 6x Down)..."
+        DOWN_COUNT=6
     else
-        tap_guest 70 218 "Programs (portrait)"
+        log "Step 2: Navigating to Programs (portrait: 7x Down)..."
+        DOWN_COUNT=7
     fi
-    sleep 2
-    capture_screenshot "03-programs-screen"
+    for i in $(seq 1 $DOWN_COUNT); do
+        emu_key Down
+    done
+    sleep 0.5
+    capture_screenshot "03-programs-highlighted"
 
-    # Step 3: Tap "File Explorer" in the Programs grid
-    # From CI screenshots: File Explorer is at row 1, col 4 (top-right area).
-    #   Landscape (320x240): File Explorer icon at approx guest (275, 55)
-    #   Portrait (240x320): File Explorer icon at approx guest (195, 55)
-    log "Step 3: Tapping File Explorer..."
-    if [ "$ROTATE" = "1" ] || [ "$ROTATE" = "3" ]; then
-        tap_guest 275 55 "File Explorer (landscape)"
-    else
-        tap_guest 195 55 "File Explorer (portrait)"
-    fi
+    log "Step 2b: Opening Programs (Enter)..."
+    emu_key Return
     sleep 2
-    capture_screenshot "04-file-explorer"
+    capture_screenshot "04-programs-screen"
 
-    # Step 4: Go up to My Device root with F1 (left softkey = "Up")
-    # File Explorer defaults to "My Documents".
-    # F1 = "Up" in File Explorer → goes to My Device root.
-    log "Step 4: Pressing F1 (Up) to reach My Device root..."
+    # Step 3: Navigate to File Explorer in Programs grid
+    # Grid: Games(col1) → ActiveSync(col2) → Calculator(col3) → File Explorer(col4)
+    # 3 Right presses from default selection (Games).
+    log "Step 3: Navigating to File Explorer (3x Right)..."
+    emu_key Right
+    emu_key Right
+    emu_key Right
+    sleep 0.5
+    capture_screenshot "05-file-explorer-highlighted"
+    emu_key Return
+    sleep 2
+    capture_screenshot "06-file-explorer-opened"
+
+    # Step 4: Navigate up from My Documents to My Device root
+    # F1 = left softkey = "Up" in File Explorer
+    log "Step 4: Going up to root (F1 = Up)..."
     emu_key F1
     sleep 1
-    capture_screenshot "05-my-device-root"
+    capture_screenshot "07-my-device-root"
 
     # Step 5: Navigate to Storage Card
-    # My Device root (from CI screenshot):
-    #   1. Application Data (selected by default)
+    # My Device root (confirmed from CI):
+    #   1. Application Data (selected)
     #   2. ConnMgr
     #   3. Documents and Settings
     #   4. MUSIC
     #   5. My Documents
     #   6. Program Files
-    #   7. Storage Card  ← target (6 Down presses)
+    #   7. Storage Card  ← target (6 Down)
     log "Step 5: Navigating to Storage Card (6x Down)..."
     for i in 1 2 3 4 5 6; do
         emu_key Down
     done
     sleep 0.5
-    capture_screenshot "06-storage-card-highlighted"
+    capture_screenshot "08-storage-card-highlighted"
     emu_key Return
     sleep 2
-    capture_screenshot "07-storage-card-contents"
+    capture_screenshot "09-storage-card-contents"
 
     # Step 6: Navigate to navit.exe
-    # Storage Card contents (sorted alphabetically, folders first):
-    #   Folders: 2577, espeak-data, icons, locale, maps (5 folders)
-    #   Files: autorun.exe, navit.exe, navit.xml, navit_layout_*.xml, ...
-    # navit.exe is the 7th item (5 folders + autorun.exe + navit.exe)
-    log "Step 6: Navigating to navit.exe (7x Down)..."
+    # Storage Card (sorted, folders first):
+    #   1. 2577/        (folder)
+    #   2. espeak-data/ (folder)
+    #   3. icons/       (folder)
+    #   4. locale/      (folder)
+    #   5. maps/        (folder)
+    #   6. autorun.exe  (file)
+    #   7. navit.exe    (file) ← target (7 Down, or 6 if first item auto-selected)
+    log "Step 6: Navigating to navit.exe..."
     for i in 1 2 3 4 5 6 7; do
         emu_key Down
     done
     sleep 0.5
-    capture_screenshot "08-navit-highlighted"
+    capture_screenshot "10-navit-highlighted"
     emu_key Return
     sleep 5
-    capture_screenshot "09-navit-launched"
+    capture_screenshot "11-navit-launched"
 
-    import -window root "$RESULTS_DIR/10-root-state-$(date '+%H%M%S').png" 2>/dev/null || true
+    import -window root "$RESULTS_DIR/12-root-state-$(date '+%H%M%S').png" 2>/dev/null || true
     log "GUI navigation complete"
 fi
 
 # --- Wait for Navit to potentially start ---
 log "Waiting 20s for Navit to initialize..."
 sleep 20
-capture_screenshot "11-after-wait"
+capture_screenshot "13-after-wait"
 
 # --- Monitor for remaining time ---
 REMAINING=$((SMOKE_TIMEOUT - (SECONDS - START)))
