@@ -207,51 +207,74 @@ else
     sleep 2
     capture_screenshot "06-file-explorer-opened"
 
-    # Step 4: Navigate up from My Documents to My Device root
-    # File Explorer defaults to "My Documents". Use Backspace to go up.
-    log "Step 4: Going up to My Device root (Backspace)..."
-    emu_key BackSpace
-    sleep 1
-    capture_screenshot "07-my-device-root"
+    # Step 4: Navigate to Storage Card using the location dropdown
+    # File Explorer defaults to "My Documents". The location dropdown at the
+    # top shows "My Documents ▼". Tap on it to open the dropdown, then select
+    # "Storage Card".
+    #
+    # Also try F1 (left softkey = "Up" in File Explorer) to go up to root.
+    log "Step 4: Navigating to Storage Card..."
 
-    # Step 5: Navigate to Storage Card
-    # My Device root contains folders alphabetically:
-    #   My Documents, Network, Program Files, Storage Card, Temp, Windows
-    # Storage Card is typically the 4th item.
-    log "Step 5: Navigating to Storage Card..."
-    # First press Down to enter the file list, then navigate
-    for i in 1 2 3 4; do
-        emu_key Down
-    done
-    sleep 0.5
-    capture_screenshot "08-storage-card-highlighted"
+    # Method A: Press F1 (left softkey = "Up") to go up to My Device root
+    log "Step 4a: Pressing F1 (Up softkey)..."
+    emu_key F1
+    sleep 1
+    capture_screenshot "07-after-F1-up"
+
+    # Press F1 again in case we need another level up
+    emu_key F1
+    sleep 1
+    capture_screenshot "08-after-F1-up2"
+
+    # Method B: Tap on the location dropdown at the top of File Explorer
+    # The dropdown "My Documents ▼" (or "My Device ▼") is at the top.
+    # In landscape (320x240): dropdown at approximately guest (80, 25)
+    # In portrait (240x320): dropdown at approximately guest (60, 25)
+    log "Step 4b: Tapping location dropdown..."
+    if [ "$ROTATE" = "1" ] || [ "$ROTATE" = "3" ]; then
+        tap_guest 80 25 "location dropdown (landscape)"
+    else
+        tap_guest 60 25 "location dropdown (portrait)"
+    fi
+    sleep 1
+    capture_screenshot "09-location-dropdown"
+
+    # The dropdown should show a list including "Storage Card".
+    # Look for it and select it. Storage Card might be the last item.
+    # Try selecting "Storage Card" with Down arrows + Enter.
+    # Dropdown items might be: My Device, My Documents, Storage Card
+    # Navigate down to find Storage Card.
+    emu_key Down
+    emu_key Down
+    sleep 0.3
+    capture_screenshot "10-dropdown-nav"
     emu_key Return
     sleep 2
-    capture_screenshot "09-storage-card-contents"
+    capture_screenshot "11-storage-card-contents"
 
-    # Step 6: Find and open navit.exe
+    # Step 5: Find and open navit.exe
     # Storage Card contents (from navit-package):
     #   Folders first (alphabetical): 2577/, espeak-data/, icons/, locale/, maps/
     #   Then files: autorun.exe, navit.exe, navit.xml, navit_layout_*.xml, ...
     # navit.exe is the 7th item (5 folders + autorun.exe + navit.exe)
-    log "Step 6: Navigating to navit.exe..."
+    log "Step 5: Navigating to navit.exe..."
     for i in 1 2 3 4 5 6 7; do
         emu_key Down
     done
     sleep 0.5
-    capture_screenshot "10-navit-highlighted"
+    capture_screenshot "12-navit-highlighted"
     emu_key Return
     sleep 5
-    capture_screenshot "11-navit-launched"
+    capture_screenshot "13-navit-launched"
 
-    import -window root "$RESULTS_DIR/12-root-state-$(date '+%H%M%S').png" 2>/dev/null || true
+    import -window root "$RESULTS_DIR/14-root-state-$(date '+%H%M%S').png" 2>/dev/null || true
     log "GUI navigation complete"
 fi
 
 # --- Wait for Navit to potentially start ---
 log "Waiting 20s for Navit to initialize..."
 sleep 20
-capture_screenshot "13-after-wait"
+capture_screenshot "15-after-wait"
 
 # --- Monitor for remaining time ---
 REMAINING=$((SMOKE_TIMEOUT - (SECONDS - START)))
