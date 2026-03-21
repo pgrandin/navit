@@ -44,6 +44,12 @@ capture_screenshot() {
     fi
 }
 
+# Send a key to the emulator window
+emu_key() {
+    xdotool key --window "$EMU_WID" "$1"
+    sleep 0.3
+}
+
 # Tap a point on the WinCE guest screen.
 # Guest coordinates are relative to the WinCE display area,
 # which starts below the host menu bar (~19px).
@@ -143,8 +149,9 @@ if ! kill -0 "$EMU_PID" 2>/dev/null; then
 fi
 
 # --- Launch Navit via WinCE File Explorer ---
-# Navigate the WinCE GUI: Start > Programs > File Explorer > Storage Card > navit.exe
-# All coordinates are in WinCE guest screen space (240x320 portrait, 320x240 landscape).
+# Navigate: Start > Programs > File Explorer > Storage Card > navit.exe
+# Use keyboard navigation (arrow keys + Enter) which works regardless of
+# screen orientation, instead of fragile pixel-coordinate tapping.
 log "Navigating WinCE GUI to launch navit.exe..."
 
 if [ -z "$EMU_WID" ]; then
@@ -153,69 +160,108 @@ else
     xdotool windowfocus "$EMU_WID" 2>/dev/null || true
     sleep 0.5
 
-    # Dismiss any "Device unlocked" notification by tapping the main area
-    tap_guest 120 160 "dismiss notifications"
+    # Step 1: Open Start menu
+    # Try multiple approaches: F1 (left softkey = Start in PPC),
+    # Windows/Super key, and direct tap on Start button.
+    log "Step 1: Opening Start menu..."
+
+    # Try F1 first (left softkey, which is "Start" on Today screen)
+    emu_key F1
     sleep 1
+    capture_screenshot "02-after-F1"
 
-    # Step 1: Tap "Start" at top-left of WinCE screen
-    # The Start button in PPC 2003 SE is in the top-left corner with a flag icon.
-    tap_guest 25 12 "Start button"
+    # Also try tapping the Start button area at the top-left
+    # The WinCE nav bar "Start" is at approximately guest (15, 5)
+    tap_guest 15 5 "Start button tap"
+    sleep 1
+    capture_screenshot "03-after-start-tap"
+
+    # Try Windows/Super key as another approach
+    emu_key super
+    sleep 1
+    capture_screenshot "04-after-super"
+
+    # Step 2: Navigate to Programs using keyboard
+    # PPC Start menu items (from landscape screenshot):
+    #   1. Today (selected by default)
+    #   2. Office Mobile
+    #   3. Calendar
+    #   4. Contacts
+    #   5. Internet Explorer
+    #   6. Messaging
+    #   7. Programs  <-- target (6 Down presses from Today)
+    log "Step 2: Navigating to Programs..."
+    for i in 1 2 3 4 5 6; do
+        emu_key Down
+    done
+    sleep 0.5
+    capture_screenshot "05-programs-highlight"
+
+    # Press Enter to open Programs
+    emu_key Return
     sleep 2
-    capture_screenshot "02-start-menu"
+    capture_screenshot "06-programs-screen"
 
-    # Step 2: Tap "Programs" in the Start menu
-    # In PPC 2003 SE, the Start menu shows items vertically.
-    # "Programs" is typically near the bottom with a folder icon.
-    # The start menu occupies roughly the top 2/3 of the screen.
-    # Common items: Today, Calendar, Contacts, IE, Messaging, etc.
-    # Programs is usually the 7th-9th item.
-    # Each item is ~26px tall. Programs at roughly y=26*8+26 = 234
-    # But there's also a title area. Let's estimate y=260.
-    tap_guest 100 260 "Programs"
+    # Step 3: Find and open File Explorer in Programs screen
+    # Programs screen shows a grid of program icons.
+    # We need to navigate to File Explorer.
+    # In PPC 2003 SE, Programs typically shows:
+    #   Row 1: Games, Calculator, ...
+    #   File Explorer might be in the list view.
+    # Try keyboard navigation: Tab/arrows to find File Explorer.
+    # First, let's just take a screenshot and see what we have.
+    # Try pressing Down a few times to find File Explorer.
+    log "Step 3: Looking for File Explorer..."
+
+    # In the Programs screen, items may be in a grid.
+    # Try navigating with arrow keys.
+    for i in 1 2 3; do
+        emu_key Down
+    done
+    sleep 0.5
+    capture_screenshot "07-programs-nav"
+
+    # Try selecting the current item
+    emu_key Return
     sleep 2
-    capture_screenshot "03-programs"
+    capture_screenshot "08-after-programs-select"
 
-    # Step 3: Tap "File Explorer" in the Programs screen
-    # The Programs screen shows icons in a grid layout.
-    # File Explorer typically has a folder icon with a magnifying glass.
-    # Icons are arranged in rows of ~4, with ~60px spacing.
-    # File Explorer is often in the first or second row.
-    # Let's try a few common positions.
-    # Row 1: y ≈ 55, icons at x ≈ 30, 90, 150, 210
-    # Row 2: y ≈ 115, icons at x ≈ 30, 90, 150, 210
-    tap_guest 40 55 "File Explorer (guess: row1, col1)"
+    # Step 4: If we're in File Explorer, look for Storage Card
+    # If not, we need to adjust. Take screenshots to diagnose.
+    log "Step 4: Looking for Storage Card..."
+    # In File Explorer list view, navigate down to find Storage Card
+    for i in 1 2 3 4 5; do
+        emu_key Down
+    done
+    sleep 0.5
+    capture_screenshot "09-file-list"
+
+    # Open selected item
+    emu_key Return
     sleep 2
-    capture_screenshot "04-after-programs-tap"
+    capture_screenshot "10-after-open"
 
-    # Step 4: Look for Storage Card in File Explorer
-    # File Explorer shows a list of folders/files in My Device.
-    # Storage Card should be one of the items.
-    # The file list starts below the address bar (~40px from top).
-    # Items are ~20px tall in list view.
-    # Common items: My Documents, Program Files, Storage Card, Windows, etc.
-    # Storage Card might be the 3rd-5th item.
-    tap_guest 100 120 "Storage Card (guess)"
-    sleep 2
-    capture_screenshot "05-storage-card"
+    # Step 5: Look for navit.exe in Storage Card
+    log "Step 5: Looking for navit.exe..."
+    # Navigate through file list
+    for i in 1 2 3; do
+        emu_key Down
+    done
+    sleep 0.5
 
-    # Step 5: Find and tap navit.exe
-    # In Storage Card, navit.exe should be in the file list.
-    # But there are many files. It might be alphabetically sorted.
-    # navit.exe would be near the middle of an alphabetical list.
-    # Let's try tapping on the first visible .exe file.
-    tap_guest 100 80 "navit.exe (guess)"
+    # Open navit.exe
+    emu_key Return
     sleep 3
-    capture_screenshot "06-navit-attempt"
+    capture_screenshot "11-navit-attempt"
 
-    # Take a root screenshot to see the full state
-    import -window root "$RESULTS_DIR/07-root-state-$(date '+%H%M%S').png" 2>/dev/null || true
+    import -window root "$RESULTS_DIR/12-root-state-$(date '+%H%M%S').png" 2>/dev/null || true
     log "GUI navigation complete"
 fi
 
 # --- Wait for Navit to potentially start ---
 log "Waiting 20s for Navit to initialize..."
 sleep 20
-capture_screenshot "08-after-wait"
+capture_screenshot "13-after-wait"
 
 # --- Monitor for remaining time ---
 REMAINING=$((SMOKE_TIMEOUT - (SECONDS - START)))
