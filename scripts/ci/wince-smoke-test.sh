@@ -51,6 +51,7 @@ emu_key() {
 }
 
 # Tap a point on the WinCE guest screen (guest coords).
+# The WinCE display starts below the host menu bar (~19px).
 MENU_BAR_H=19
 tap_guest() {
     local gx="$1" gy="$2" label="${3:-}"
@@ -145,26 +146,21 @@ if ! kill -0 "$EMU_PID" 2>/dev/null; then
 fi
 
 # --- Launch Navit via WinCE File Explorer ---
-# Navigate: Start > Programs > File Explorer > [up to root] > Storage Card > navit.exe
+# Navigate: Start > Programs > File Explorer > [root] > Storage Card > navit.exe
 #
-# Keyboard navigation:
-#   Super      → opens Start menu
-#   Down x6    → highlights "Programs"
-#   Return     → opens Programs screen
-#   Right x3   → highlights "File Explorer" (grid: row1 col4)
-#   Return     → opens File Explorer (defaults to My Documents)
-#   Backspace  → goes up to My Device root
-#   Down to "Storage Card" → Enter → navigate to navit.exe → Enter
+# Confirmed from CI screenshots:
 #
-# The Start menu layout (confirmed from landscape CI screenshots):
+# Start menu items (Super key opens it):
 #   Today, Office Mobile, Calendar, Contacts, Internet Explorer, Messaging,
-#   [Recent Programs header - not selectable],
-#   Programs, Settings, Help
+#   [Recent Programs header], Programs, Settings, Help
 #
-# Programs grid layout (4 columns, confirmed from CI screenshots):
+# Programs grid (4 columns):
 #   Row 1: Games | ActiveSync | Calculator | File Explorer
-#   Row 2: Getting Started | Internet Sharing | Messenger | Notes
-#   ...
+#
+# My Device root folders (F1 = Up from My Documents):
+#   Application Data, ConnMgr, Documents and Settings, MUSIC,
+#   My Documents, Program Files, Storage Card, Temp, Windows
+#   → Storage Card is the 7th item (6 Down from Application Data)
 log "Navigating WinCE GUI to launch navit.exe..."
 
 if [ -z "$EMU_WID" ]; then
@@ -173,108 +169,89 @@ else
     xdotool windowfocus "$EMU_WID" 2>/dev/null || true
     sleep 0.5
 
-    # Step 1: Open Start menu with Super (Windows) key
-    log "Step 1: Opening Start menu (Super key)..."
+    # Step 1: Open Start menu with Super key
+    log "Step 1: Opening Start menu..."
     emu_key super
     sleep 1
     capture_screenshot "02-start-menu"
 
-    # Step 2: Navigate to Programs (6x Down + Enter)
-    # From CI: Today is first, Programs is 7th selectable item (6 Down)
-    log "Step 2: Navigating to Programs (6x Down)..."
+    # Step 2: Tap "Programs" in the Start menu
+    # Use direct tap coordinates instead of arrow keys (more reliable).
+    # From CI screenshots:
+    #   Landscape (320x240): Programs at approx guest (70, 168)
+    #   Portrait (240x320): Programs at approx guest (70, 218)
+    log "Step 2: Tapping Programs..."
+    if [ "$ROTATE" = "1" ] || [ "$ROTATE" = "3" ]; then
+        tap_guest 70 168 "Programs (landscape)"
+    else
+        tap_guest 70 218 "Programs (portrait)"
+    fi
+    sleep 2
+    capture_screenshot "03-programs-screen"
+
+    # Step 3: Tap "File Explorer" in the Programs grid
+    # From CI screenshots: File Explorer is at row 1, col 4 (top-right area).
+    #   Landscape (320x240): File Explorer icon at approx guest (275, 55)
+    #   Portrait (240x320): File Explorer icon at approx guest (195, 55)
+    log "Step 3: Tapping File Explorer..."
+    if [ "$ROTATE" = "1" ] || [ "$ROTATE" = "3" ]; then
+        tap_guest 275 55 "File Explorer (landscape)"
+    else
+        tap_guest 195 55 "File Explorer (portrait)"
+    fi
+    sleep 2
+    capture_screenshot "04-file-explorer"
+
+    # Step 4: Go up to My Device root with F1 (left softkey = "Up")
+    # File Explorer defaults to "My Documents".
+    # F1 = "Up" in File Explorer → goes to My Device root.
+    log "Step 4: Pressing F1 (Up) to reach My Device root..."
+    emu_key F1
+    sleep 1
+    capture_screenshot "05-my-device-root"
+
+    # Step 5: Navigate to Storage Card
+    # My Device root (from CI screenshot):
+    #   1. Application Data (selected by default)
+    #   2. ConnMgr
+    #   3. Documents and Settings
+    #   4. MUSIC
+    #   5. My Documents
+    #   6. Program Files
+    #   7. Storage Card  ← target (6 Down presses)
+    log "Step 5: Navigating to Storage Card (6x Down)..."
     for i in 1 2 3 4 5 6; do
         emu_key Down
     done
     sleep 0.5
-    capture_screenshot "03-programs-highlighted"
-
-    # Use Enter to open Programs.
-    # In PPC, the action button to open an item is typically Enter/Return.
-    log "Step 2b: Opening Programs (Enter)..."
+    capture_screenshot "06-storage-card-highlighted"
     emu_key Return
     sleep 2
-    capture_screenshot "04-programs-screen"
+    capture_screenshot "07-storage-card-contents"
 
-    # Step 3: Navigate to File Explorer (3x Right + Enter)
-    # Grid: Games(col1) → ActiveSync(col2) → Calculator(col3) → File Explorer(col4)
-    log "Step 3: Navigating to File Explorer (3x Right)..."
-    emu_key Right
-    emu_key Right
-    emu_key Right
-    sleep 0.5
-    capture_screenshot "05-file-explorer-highlighted"
-    emu_key Return
-    sleep 2
-    capture_screenshot "06-file-explorer-opened"
-
-    # Step 4: Navigate to Storage Card using the location dropdown
-    # File Explorer defaults to "My Documents". The location dropdown at the
-    # top shows "My Documents ▼". Tap on it to open the dropdown, then select
-    # "Storage Card".
-    #
-    # Also try F1 (left softkey = "Up" in File Explorer) to go up to root.
-    log "Step 4: Navigating to Storage Card..."
-
-    # Method A: Press F1 (left softkey = "Up") to go up to My Device root
-    log "Step 4a: Pressing F1 (Up softkey)..."
-    emu_key F1
-    sleep 1
-    capture_screenshot "07-after-F1-up"
-
-    # Press F1 again in case we need another level up
-    emu_key F1
-    sleep 1
-    capture_screenshot "08-after-F1-up2"
-
-    # Method B: Tap on the location dropdown at the top of File Explorer
-    # The dropdown "My Documents ▼" (or "My Device ▼") is at the top.
-    # In landscape (320x240): dropdown at approximately guest (80, 25)
-    # In portrait (240x320): dropdown at approximately guest (60, 25)
-    log "Step 4b: Tapping location dropdown..."
-    if [ "$ROTATE" = "1" ] || [ "$ROTATE" = "3" ]; then
-        tap_guest 80 25 "location dropdown (landscape)"
-    else
-        tap_guest 60 25 "location dropdown (portrait)"
-    fi
-    sleep 1
-    capture_screenshot "09-location-dropdown"
-
-    # The dropdown should show a list including "Storage Card".
-    # Look for it and select it. Storage Card might be the last item.
-    # Try selecting "Storage Card" with Down arrows + Enter.
-    # Dropdown items might be: My Device, My Documents, Storage Card
-    # Navigate down to find Storage Card.
-    emu_key Down
-    emu_key Down
-    sleep 0.3
-    capture_screenshot "10-dropdown-nav"
-    emu_key Return
-    sleep 2
-    capture_screenshot "11-storage-card-contents"
-
-    # Step 5: Find and open navit.exe
-    # Storage Card contents (from navit-package):
-    #   Folders first (alphabetical): 2577/, espeak-data/, icons/, locale/, maps/
-    #   Then files: autorun.exe, navit.exe, navit.xml, navit_layout_*.xml, ...
+    # Step 6: Navigate to navit.exe
+    # Storage Card contents (sorted alphabetically, folders first):
+    #   Folders: 2577, espeak-data, icons, locale, maps (5 folders)
+    #   Files: autorun.exe, navit.exe, navit.xml, navit_layout_*.xml, ...
     # navit.exe is the 7th item (5 folders + autorun.exe + navit.exe)
-    log "Step 5: Navigating to navit.exe..."
+    log "Step 6: Navigating to navit.exe (7x Down)..."
     for i in 1 2 3 4 5 6 7; do
         emu_key Down
     done
     sleep 0.5
-    capture_screenshot "12-navit-highlighted"
+    capture_screenshot "08-navit-highlighted"
     emu_key Return
     sleep 5
-    capture_screenshot "13-navit-launched"
+    capture_screenshot "09-navit-launched"
 
-    import -window root "$RESULTS_DIR/14-root-state-$(date '+%H%M%S').png" 2>/dev/null || true
+    import -window root "$RESULTS_DIR/10-root-state-$(date '+%H%M%S').png" 2>/dev/null || true
     log "GUI navigation complete"
 fi
 
 # --- Wait for Navit to potentially start ---
 log "Waiting 20s for Navit to initialize..."
 sleep 20
-capture_screenshot "15-after-wait"
+capture_screenshot "11-after-wait"
 
 # --- Monitor for remaining time ---
 REMAINING=$((SMOKE_TIMEOUT - (SECONDS - START)))
