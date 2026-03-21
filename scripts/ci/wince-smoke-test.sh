@@ -50,6 +50,16 @@ emu_key() {
     sleep 0.3
 }
 
+# Tap a point on the WinCE guest screen (guest coords).
+MENU_BAR_H=19
+tap_guest() {
+    local gx="$1" gy="$2" label="${3:-}"
+    [ -n "$label" ] && log "Tap ($gx,$gy) [${label}]"
+    xdotool mousemove --window "$EMU_WID" "$gx" "$((gy + MENU_BAR_H))"
+    sleep 0.3
+    xdotool click --window "$EMU_WID" 1
+}
+
 cleanup() {
     log "Cleaning up..."
     [ -n "${EMU_PID:-}" ] && kill "$EMU_PID" 2>/dev/null && sleep 1 && kill -9 "$EMU_PID" 2>/dev/null || true
@@ -135,21 +145,26 @@ if ! kill -0 "$EMU_PID" 2>/dev/null; then
 fi
 
 # --- Launch Navit via WinCE File Explorer ---
-# Navigate: Start > Programs > File Explorer > Storage Card > navit.exe
-# Use keyboard navigation (Super, arrows, Enter).
+# Navigate: Start > Programs > File Explorer > [up to root] > Storage Card > navit.exe
 #
-# Start menu layout (from CI screenshots):
+# Keyboard navigation:
+#   Super      → opens Start menu
+#   Down x6    → highlights "Programs"
+#   Return     → opens Programs screen
+#   Right x3   → highlights "File Explorer" (grid: row1 col4)
+#   Return     → opens File Explorer (defaults to My Documents)
+#   Backspace  → goes up to My Device root
+#   Down to "Storage Card" → Enter → navigate to navit.exe → Enter
+#
+# The Start menu layout (confirmed from landscape CI screenshots):
 #   Today, Office Mobile, Calendar, Contacts, Internet Explorer, Messaging,
-#   [Recent Programs header], Programs, Settings, Help
-#   → 6 Down presses to reach Programs
+#   [Recent Programs header - not selectable],
+#   Programs, Settings, Help
 #
-# Programs screen grid layout (4 columns):
+# Programs grid layout (4 columns, confirmed from CI screenshots):
 #   Row 1: Games | ActiveSync | Calculator | File Explorer
 #   Row 2: Getting Started | Internet Sharing | Messenger | Notes
-#   Row 3: Pictures & Videos | Search | SimTkUI | Task Manager
-#   Row 4: Tasks | Windows | Windows
-#   → Default selection: Games (row 1, col 1)
-#   → File Explorer: 3 Right presses
+#   ...
 log "Navigating WinCE GUI to launch navit.exe..."
 
 if [ -z "$EMU_WID" ]; then
@@ -165,77 +180,78 @@ else
     capture_screenshot "02-start-menu"
 
     # Step 2: Navigate to Programs (6x Down + Enter)
-    log "Step 2: Navigating to Programs..."
+    # From CI: Today is first, Programs is 7th selectable item (6 Down)
+    log "Step 2: Navigating to Programs (6x Down)..."
     for i in 1 2 3 4 5 6; do
         emu_key Down
     done
     sleep 0.5
-    capture_screenshot "03-programs-highlight"
+    capture_screenshot "03-programs-highlighted"
+
+    # Use Enter to open Programs.
+    # In PPC, the action button to open an item is typically Enter/Return.
+    log "Step 2b: Opening Programs (Enter)..."
     emu_key Return
     sleep 2
     capture_screenshot "04-programs-screen"
 
     # Step 3: Navigate to File Explorer (3x Right + Enter)
-    # Grid layout: Games is selected by default (row 1, col 1).
-    # File Explorer is at row 1, col 4 → 3 Right presses.
-    log "Step 3: Navigating to File Explorer..."
+    # Grid: Games(col1) → ActiveSync(col2) → Calculator(col3) → File Explorer(col4)
+    log "Step 3: Navigating to File Explorer (3x Right)..."
     emu_key Right
     emu_key Right
     emu_key Right
     sleep 0.5
-    capture_screenshot "05-file-explorer-highlight"
+    capture_screenshot "05-file-explorer-highlighted"
     emu_key Return
     sleep 2
-    capture_screenshot "06-file-explorer"
+    capture_screenshot "06-file-explorer-opened"
 
-    # Step 4: Navigate to Storage Card in File Explorer
-    # File Explorer opens showing "My Device" contents.
-    # Folders listed alphabetically: My Documents, Program Files,
-    # Storage Card, Temp, Windows, etc.
-    # "Storage Card" is typically the 3rd or 4th item.
-    # Navigate down and look for it.
-    log "Step 4: Navigating to Storage Card..."
-    # First item might be selected or we might need to move into the list.
-    # Try Down a few times to reach Storage Card.
-    emu_key Down
-    emu_key Down
-    emu_key Down
+    # Step 4: Navigate up from My Documents to My Device root
+    # File Explorer defaults to "My Documents". Use Backspace to go up.
+    log "Step 4: Going up to My Device root (Backspace)..."
+    emu_key BackSpace
+    sleep 1
+    capture_screenshot "07-my-device-root"
+
+    # Step 5: Navigate to Storage Card
+    # My Device root contains folders alphabetically:
+    #   My Documents, Network, Program Files, Storage Card, Temp, Windows
+    # Storage Card is typically the 4th item.
+    log "Step 5: Navigating to Storage Card..."
+    # First press Down to enter the file list, then navigate
+    for i in 1 2 3 4; do
+        emu_key Down
+    done
     sleep 0.5
-    capture_screenshot "07-storage-card-highlight"
+    capture_screenshot "08-storage-card-highlighted"
     emu_key Return
     sleep 2
-    capture_screenshot "08-storage-card-contents"
+    capture_screenshot "09-storage-card-contents"
 
-    # Step 5: Find and open navit.exe in Storage Card
-    # The Storage Card contains navit package files.
-    # Folders come first (2577, espeak-data, icons, locale, maps),
-    # then files alphabetically.
-    # navit.exe is in the file list after the folders.
-    # Need to navigate past folders to find navit.exe.
-    log "Step 5: Looking for navit.exe..."
-    # Navigate down through the file list.
-    # Folders: 2577, espeak-data, icons, locale, maps = 5 folders
-    # Then files: autorun.exe, navit.exe, navit.xml, ...
-    # navit.exe should be ~7 items down (5 folders + autorun.exe + navit.exe)
+    # Step 6: Find and open navit.exe
+    # Storage Card contents (from navit-package):
+    #   Folders first (alphabetical): 2577/, espeak-data/, icons/, locale/, maps/
+    #   Then files: autorun.exe, navit.exe, navit.xml, navit_layout_*.xml, ...
+    # navit.exe is the 7th item (5 folders + autorun.exe + navit.exe)
+    log "Step 6: Navigating to navit.exe..."
     for i in 1 2 3 4 5 6 7; do
         emu_key Down
     done
     sleep 0.5
-    capture_screenshot "09-navit-highlight"
-
-    # Open navit.exe
+    capture_screenshot "10-navit-highlighted"
     emu_key Return
     sleep 5
-    capture_screenshot "10-navit-launched"
+    capture_screenshot "11-navit-launched"
 
-    import -window root "$RESULTS_DIR/11-root-state-$(date '+%H%M%S').png" 2>/dev/null || true
+    import -window root "$RESULTS_DIR/12-root-state-$(date '+%H%M%S').png" 2>/dev/null || true
     log "GUI navigation complete"
 fi
 
 # --- Wait for Navit to potentially start ---
 log "Waiting 20s for Navit to initialize..."
 sleep 20
-capture_screenshot "12-after-wait"
+capture_screenshot "13-after-wait"
 
 # --- Monitor for remaining time ---
 REMAINING=$((SMOKE_TIMEOUT - (SECONDS - START)))
