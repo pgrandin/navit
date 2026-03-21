@@ -186,12 +186,19 @@ else
     capture_screenshot "04-programs-screen"
 
     # Step 3: Navigate to File Explorer in Programs grid
-    # Grid: Games(col1) → ActiveSync(col2) → Calculator(col3) → File Explorer(col4)
-    # 3 Right presses from default selection (Games).
-    log "Step 3: Navigating to File Explorer (3x Right)..."
-    emu_key Right
-    emu_key Right
-    emu_key Right
+    # Landscape grid (4 columns): Games | ActiveSync | Calculator | File Explorer
+    #   → 3 Right from Games
+    # Portrait grid (3 columns): Games | ActiveSync | Calculator
+    #                            File Explorer | Getting Started | ...
+    #   → 1 Down from Games (File Explorer is row 2, col 1)
+    log "Step 3: Navigating to File Explorer..."
+    if [ "$ROTATE" = "1" ] || [ "$ROTATE" = "3" ]; then
+        emu_key Right
+        emu_key Right
+        emu_key Right
+    else
+        emu_key Down
+    fi
     sleep 0.5
     capture_screenshot "05-file-explorer-highlighted"
     emu_key Return
@@ -225,20 +232,16 @@ else
     capture_screenshot "09-storage-card-contents"
 
     # Step 6: Navigate to navit.exe
-    # Storage Card (sorted, folders first):
-    #   1. 2577/        (folder)
-    #   2. espeak-data/ (folder)
-    #   3. icons/       (folder)
-    #   4. locale/      (folder)
-    #   5. maps/        (folder)
-    #   6. autorun.exe  (file)
-    #   7. navit.exe    (file) ← target (7 Down, or 6 if first item auto-selected)
-    log "Step 6: Navigating to navit.exe..."
-    for i in 1 2 3 4 5 6 7; do
-        emu_key Down
-    done
-    sleep 0.5
+    # Use type-ahead: pressing "n" in File Explorer jumps to the first
+    # file starting with "n" = navit.exe (7.93M, the largest "navit" file).
+    # Folders are listed first, then files alphabetically.
+    # autorun.exe comes before navit*, so "n" should jump to navit.exe.
+    log "Step 6: Jumping to navit.exe (type-ahead 'n')..."
+    xdotool type --window "$EMU_WID" "n"
+    sleep 1
     capture_screenshot "10-navit-highlighted"
+
+    # navit.exe should now be highlighted. Open it.
     emu_key Return
     sleep 5
     capture_screenshot "11-navit-launched"
