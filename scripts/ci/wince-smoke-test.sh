@@ -290,6 +290,40 @@ fi
 find "$NAVIT_DIR" -name "*.log" -exec cp {} "$RESULTS_DIR/" \; 2>/dev/null || true
 ps aux > "$RESULTS_DIR/processes.txt" 2>/dev/null || true
 
+# --- Check navit.log for env var expansion ---
+NAVIT_LOG="$NAVIT_DIR/navit.log"
+if [ -f "$NAVIT_LOG" ]; then
+    cp "$NAVIT_LOG" "$RESULTS_DIR/"
+    log "navit.log found ($(wc -l < "$NAVIT_LOG") lines)"
+
+    # Check if $NAVIT_SHAREDIR was expanded (not left as literal)
+    if grep -q '\$NAVIT_SHAREDIR' "$NAVIT_LOG"; then
+        log "FAIL: \$NAVIT_SHAREDIR not expanded — env var fix is broken"
+        grep '\$NAVIT_SHAREDIR' "$NAVIT_LOG" | head -5 | while read -r line; do log "  $line"; done
+        ENVVAR_FAIL=1
+    fi
+
+    # Check for the specific error from issue #1499
+    if grep -q "Failed to load.*\\\$" "$NAVIT_LOG"; then
+        log "FAIL: Map loading failed with unexpanded variable (issue #1499)"
+        grep "Failed to load" "$NAVIT_LOG" | head -5 | while read -r line; do log "  $line"; done
+        ENVVAR_FAIL=1
+    fi
+
+    # Check for successful map loading
+    if grep -qi "binfile.*open\|map_new.*binfile" "$NAVIT_LOG"; then
+        log "PASS: binfile map operations detected in log"
+    fi
+
+    if [ "${ENVVAR_FAIL:-0}" = "1" ]; then
+        log "Results in $RESULTS_DIR/"
+        ls -la "$RESULTS_DIR/"
+        exit 1
+    fi
+else
+    log "WARNING: navit.log not found in shared folder"
+fi
+
 log "Results in $RESULTS_DIR/"
 ls -la "$RESULTS_DIR/"
 exit 0
