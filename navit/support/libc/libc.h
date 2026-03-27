@@ -9,6 +9,7 @@ int pclose(void *stream);
 char*	getenv	(const char*);
 
 int setenv(const char *name, const char *value, int overwrite);
+int unsetenv(const char *name);
 
 void raise(int signal);
 
@@ -49,6 +50,8 @@ size_t strftime (char *s, size_t maxsize, const char *format, const struct tm *t
 
 #ifdef WIN32
 #define getenv      _getenv
+#define setenv      _setenv
+#define unsetenv    _unsetenv
 #endif
 
 #endif

@@ -43,7 +43,7 @@ _getenv(const char *name)
 }
 
 int
-setenv(const char *name, const char *value, int overwrite)
+_setenv(const char *name, const char *value, int overwrite)
 {
 	int i;
 	char *val;
@@ -79,7 +79,7 @@ setenv(const char *name, const char *value, int overwrite)
 	return -1;
 }
 
-int unsetenv(const char *name)
+int _unsetenv(const char *name)
 {
 	int i;
 	for (i=0; i < MAXENV; i++) {
