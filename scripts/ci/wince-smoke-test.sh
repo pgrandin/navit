@@ -291,7 +291,14 @@ find "$NAVIT_DIR" -name "*.log" -exec cp {} "$RESULTS_DIR/" \; 2>/dev/null || tr
 ps aux > "$RESULTS_DIR/processes.txt" 2>/dev/null || true
 
 # --- Check navit.log for env var expansion ---
-NAVIT_LOG="$NAVIT_DIR/navit.log"
+# The Device Emulator shared folder may be read-only from WinCE side,
+# so navit.log might not appear in $NAVIT_DIR. Search broader locations too.
+log "Searching for navit.log..."
+find "$NAVIT_DIR" "$WINEPREFIX" -name "navit.log" 2>/dev/null | while read -r f; do
+    log "  Found: $f ($(wc -c < "$f") bytes)"
+done
+NAVIT_LOG="$(find "$NAVIT_DIR" "$WINEPREFIX" -name "navit.log" 2>/dev/null | head -1)"
+[ -z "$NAVIT_LOG" ] && NAVIT_LOG="$NAVIT_DIR/navit.log"
 if [ -f "$NAVIT_LOG" ]; then
     cp "$NAVIT_LOG" "$RESULTS_DIR/"
     log "navit.log found ($(wc -l < "$NAVIT_LOG") lines)"
