@@ -180,19 +180,11 @@ else
     capture_screenshot "04-programs-screen"
 
     # Step 3: Navigate to File Explorer in Programs grid
-    # Landscape grid (4 columns): Games | ActiveSync | Calculator | File Explorer
-    #   → 3 Right from Games
-    # Portrait grid (3 columns): Games | ActiveSync | Calculator
-    #                            File Explorer | Getting Started | ...
-    #   → 1 Down from Games (File Explorer is row 2, col 1)
-    log "Step 3: Navigating to File Explorer..."
-    if [ "$ROTATE" = "1" ] || [ "$ROTATE" = "3" ]; then
-        emu_key Right
-        emu_key Right
-        emu_key Right
-    else
-        emu_key Down
-    fi
+    # The grid layout varies by orientation and screen size, so counting
+    # arrows is unreliable. Use type-ahead: pressing "f" jumps to the first
+    # item starting with "F" = File Explorer.
+    log "Step 3: Jumping to File Explorer (type-ahead 'f')..."
+    xdotool type --window "$EMU_WID" "f"
     sleep 0.5
     capture_screenshot "05-file-explorer-highlighted"
     emu_key Return
