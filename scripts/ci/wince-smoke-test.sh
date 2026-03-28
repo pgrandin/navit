@@ -162,21 +162,14 @@ else
     capture_screenshot "02-start-menu"
 
     # Step 2: Navigate to Programs
-    # Landscape: Today is pre-selected → 6 Down reaches Programs
-    # Portrait: might not have pre-selection → 7 Down as fallback
-    # Use 7 Down for safety (if already on Programs, one extra Down goes to Settings,
-    # but we then press Up once to compensate).
-    # Actually: use different counts per orientation.
-    if [ "$ROTATE" = "1" ] || [ "$ROTATE" = "3" ]; then
-        log "Step 2: Navigating to Programs (landscape: 6x Down)..."
-        DOWN_COUNT=6
-    else
-        log "Step 2: Navigating to Programs (portrait: 7x Down)..."
-        DOWN_COUNT=7
-    fi
-    for i in $(seq 1 $DOWN_COUNT); do
-        emu_key Down
-    done
+    # The Start menu has a variable number of recent items at the top, making
+    # Down-counting unreliable. Instead, jump to the bottom with End, then go
+    # Up to reach "Programs" which is always 2 above the bottom (Help → Settings → Programs).
+    log "Step 2: Navigating to Programs (End then 2x Up)..."
+    emu_key End
+    sleep 0.3
+    emu_key Up
+    emu_key Up
     sleep 0.5
     capture_screenshot "03-programs-highlighted"
 
