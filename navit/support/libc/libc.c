@@ -31,7 +31,7 @@ static void cleanup_libc(void)
 }
 
 char *
-_getenv(const char *name)
+getenv(const char *name)
 {
 	int i;
 	for (i=0; i < MAXENV; i++) {
@@ -43,7 +43,7 @@ _getenv(const char *name)
 }
 
 int
-_setenv(const char *name, const char *value, int overwrite)
+setenv(const char *name, const char *value, int overwrite)
 {
 	int i;
 	char *val;
@@ -79,7 +79,7 @@ _setenv(const char *name, const char *value, int overwrite)
 	return -1;
 }
 
-int _unsetenv(const char *name)
+int unsetenv(const char *name)
 {
 	int i;
 	for (i=0; i < MAXENV; i++) {

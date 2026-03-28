@@ -48,10 +48,9 @@ size_t strftime (char *s, size_t maxsize, const char *format, const struct tm *t
 
 #endif
 
-#if defined(WIN32) || defined(WINCE)
-#define getenv      _getenv
-#define setenv      _setenv
-#define unsetenv    _unsetenv
-#endif
+/* On WinCE, getenv/setenv/unsetenv are redirected to navit's custom
+ * implementations (_getenv/_setenv/_unsetenv) via -D flags in CMakeLists.txt.
+ * This ensures ALL translation units use the working versions, not the
+ * broken stubs from the WinCE compiler runtime. */
 
 #endif
