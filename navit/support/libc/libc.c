@@ -1,3 +1,14 @@
+/* The WinCE compiler provides broken inline stubs for getenv/setenv/unsetenv
+ * in <stdlib.h>. CMakeLists.txt adds -Dgetenv=navit_getenv (etc.) to redirect
+ * all callers to our implementations. Undo the macros BEFORE including
+ * <stdlib.h> so the inline stubs keep their original names and don't collide
+ * with our navit_* function definitions below. */
+#ifdef WINCE
+#undef getenv
+#undef setenv
+#undef unsetenv
+#endif
+
 #include "locale.h"
 #include <stdlib.h>
 #include <string.h>
@@ -6,16 +17,6 @@
 #endif
 #ifdef PLATFORM_WINDOWS
 #include "windows.h"
-#endif
-
-/* The WinCE compiler provides broken inline stubs for getenv/setenv/unsetenv
- * in <stdlib.h>. CMakeLists.txt adds -Dgetenv=navit_getenv (etc.) to redirect
- * all callers to our implementations. Undo the macro here so we can define
- * the navit_* functions without colliding with the renamed stubs. */
-#ifdef WINCE
-#undef getenv
-#undef setenv
-#undef unsetenv
 #endif
 
 int errno;
