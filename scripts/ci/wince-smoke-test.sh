@@ -163,11 +163,12 @@ else
 
     # Step 2: Navigate to Programs
     # The Start menu has a variable number of recent items at the top, making
-    # Down-counting unreliable. Instead, jump to the bottom with End, then go
-    # Up to reach "Programs" which is always 2 above the bottom (Help → Settings → Programs).
-    log "Step 2: Navigating to Programs (End then 2x Up)..."
-    emu_key End
-    sleep 0.3
+    # Down-counting unreliable. From the initial "Today" position, pressing Up
+    # wraps to the bottom of the menu (Help). The fixed bottom items are:
+    #   ... → Programs → Settings → Help
+    # So 3x Up from Today: Help → Settings → Programs.
+    log "Step 2: Navigating to Programs (3x Up to wrap from bottom)..."
+    emu_key Up
     emu_key Up
     emu_key Up
     sleep 0.5
