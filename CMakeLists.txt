@@ -717,7 +717,7 @@ if(WINCE)
 	set(BUILD_MAPTOOL FALSE)
 	# The WinCE compiler (mingw32ce) ships broken getenv/setenv/unsetenv stubs.
 	# Redirect all callers to navit's custom implementations in support/libc.
-	add_definitions(-Dgetenv=_getenv -Dsetenv=_setenv -Dunsetenv=_unsetenv)
+	add_definitions(-Dgetenv=navit_getenv -Dsetenv=navit_setenv -Dunsetenv=navit_unsetenv)
 	# mingw32ce since gcc 4.7.0 needs HAVE_PRAGMA_PACK as __attribute__((packed)) is broken, see gcc bug 52991
 	set(HAVE_PRAGMA_PACK 1)
 	set_with_reason(vehicle/file "wince: currently broken" FALSE)
