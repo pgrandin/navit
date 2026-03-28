@@ -8,6 +8,16 @@
 #include "windows.h"
 #endif
 
+/* The WinCE compiler provides broken inline stubs for getenv/setenv/unsetenv
+ * in <stdlib.h>. CMakeLists.txt adds -Dgetenv=navit_getenv (etc.) to redirect
+ * all callers to our implementations. Undo the macro here so we can define
+ * the navit_* functions without colliding with the renamed stubs. */
+#ifdef WINCE
+#undef getenv
+#undef setenv
+#undef unsetenv
+#endif
+
 int errno;
 
 #define MAXENV 32
@@ -31,7 +41,7 @@ static void cleanup_libc(void)
 }
 
 char *
-getenv(const char *name)
+navit_getenv(const char *name)
 {
 	int i;
 	for (i=0; i < MAXENV; i++) {
@@ -43,7 +53,7 @@ getenv(const char *name)
 }
 
 int
-setenv(const char *name, const char *value, int overwrite)
+navit_setenv(const char *name, const char *value, int overwrite)
 {
 	int i;
 	char *val;
@@ -79,7 +89,7 @@ setenv(const char *name, const char *value, int overwrite)
 	return -1;
 }
 
-int unsetenv(const char *name)
+int navit_unsetenv(const char *name)
 {
 	int i;
 	for (i=0; i < MAXENV; i++) {
