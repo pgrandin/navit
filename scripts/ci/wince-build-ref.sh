@@ -33,6 +33,8 @@ echo "[wince-build-ref] Building $(git rev-parse HEAD) from $TARGET_REF"
 mkdir -p /var/lib/apt/lists/partial
 apt-get update
 apt-get install -y xsltproc cmake gettext git zip librsvg2-bin gcab
+export MINGW32CE_PATH="${MINGW32CE_PATH:-/opt/cegcc-arm}"
+export PATH="$MINGW32CE_PATH/bin:$PATH"
 
 # Older refs used WindowsCETest, which does not work with the current WinCE
 # build image. Use one shared system name so the regression job compares the
