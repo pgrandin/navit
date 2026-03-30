@@ -30,22 +30,36 @@ git worktree add --force --detach "$WORKTREE_DIR" "$TARGET_REF"
 cd "$WORKTREE_DIR"
 echo "[wince-build-ref] Building $(git rev-parse HEAD) from $TARGET_REF"
 
-# Older refs ship SAMPLE_MAP=n by default. Flip it on here so the smoke test
-# actually exercises binfile loading for the regression comparison.
-if grep -q -- "-DSAMPLE_MAP=n" scripts/build_wince.sh; then
-    sed -i "s/-DSAMPLE_MAP=n/-DSAMPLE_MAP=y/g" scripts/build_wince.sh
-fi
-
 bash scripts/setup_wince.sh
-bash scripts/build_wince.sh
+
+SYSTEM_NAME="$(sed -n 's/.*-DCMAKE_SYSTEM_NAME=\([^[:space:]]*\).*/\1/p' scripts/build_wince.sh | head -1)"
+[ -n "$SYSTEM_NAME" ] || SYSTEM_NAME="WindowsCE"
+
+mkdir -p wince
+cd wince
+
+cmake \
+  -DTARGET_ARCH=arm-mingw32ce -DCMAKE_SYSTEM_NAME="$SYSTEM_NAME" \
+  -DCMAKE_TOOLCHAIN_FILE=../Toolchain/mingw.cmake \
+  -DXSLTS=windows,wince -DCACHE_SIZE=10485760 -Dsvg2png_scaling:STRING=16,32 \
+  -Dsvg2png_scaling_nav:STRING=32 -Dsvg2png_scaling_flag=16 -DSAMPLE_MAP=y ..
+make VERBOSE=1
 
 # Some older refs enable the sample map at build time but never copy the
 # generated files into wince/output/. Normalize the package layout here.
-mkdir -p wince/output/maps
-cp wince/navit/maps/*.bin wince/output/maps/ 2>/dev/null || true
-cp wince/navit/maps/*.xml wince/output/maps/ 2>/dev/null || true
+rm -rf output
+mkdir -p output/maps
+cp navit/navit.exe output/
+cp navit/navit.xml output/
+cp navit/navit_layout*.xml output/ 2>/dev/null || true
+cp -r locale/ output/
+cp -r navit/icons/ output/
+cp -r ../navit/support/espeak/espeak-data/ output/ 2>/dev/null || true
+cp navit/maps/*.bin output/maps/ 2>/dev/null || true
+cp navit/maps/*.xml output/maps/ 2>/dev/null || true
+rm -rf output/icons/CMakeFiles/ icons/cmake_install.cmake
 
 mkdir -p "$ARTIFACT_DIR"
-cp -a wince/output/. "$ARTIFACT_DIR/"
+cp -a output/. "$ARTIFACT_DIR/"
 git rev-parse HEAD > "$ARTIFACT_DIR/COMMIT_SHA"
 printf "%s\n" "$TARGET_REF" > "$ARTIFACT_DIR/SOURCE_REF"
