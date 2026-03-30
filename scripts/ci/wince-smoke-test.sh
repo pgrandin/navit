@@ -20,6 +20,8 @@ NAVIT_DIR="${NAVIT_DIR:-navit-package}"
 RESULTS_DIR="smoke-results"
 SMOKE_TIMEOUT="${SMOKE_TIMEOUT:-180}"
 ROTATE="${ROTATE:-0}"
+REQUIRE_NAVIT_LOG="${REQUIRE_NAVIT_LOG:-0}"
+FAIL_ON_MAP_LOAD_ERROR="${FAIL_ON_MAP_LOAD_ERROR:-0}"
 
 export WINEPREFIX="$PWD/.wine-emu"
 export WINEARCH=win32
@@ -296,11 +298,16 @@ if [ -f "$NAVIT_LOG" ]; then
         ENVVAR_FAIL=1
     fi
 
-    # Check for the specific error from issue #1499
-    if grep -q "Failed to load.*\\\$" "$NAVIT_LOG"; then
-        log "FAIL: Map loading failed with unexpanded variable (issue #1499)"
+    # Catch the specific issue #1499 symptom as well as a plain binfile load failure
+    if grep -Eqi 'Failed to load.*maps[/\\].*\.bin' "$NAVIT_LOG"; then
+        if grep -q "Failed to load.*\\\$" "$NAVIT_LOG"; then
+            log "FAIL: Map loading failed with unexpanded variable (issue #1499)"
+            ENVVAR_FAIL=1
+        elif [ "$FAIL_ON_MAP_LOAD_ERROR" = "1" ]; then
+            log "FAIL: Map loading failed for packaged .bin map"
+            MAP_LOAD_FAIL=1
+        fi
         grep "Failed to load" "$NAVIT_LOG" | head -5 | while read -r line; do log "  $line"; done
-        ENVVAR_FAIL=1
     fi
 
     # Check for successful map loading
@@ -308,12 +315,16 @@ if [ -f "$NAVIT_LOG" ]; then
         log "PASS: binfile map operations detected in log"
     fi
 
-    if [ "${ENVVAR_FAIL:-0}" = "1" ]; then
+    if [ "${ENVVAR_FAIL:-0}" = "1" ] || [ "${MAP_LOAD_FAIL:-0}" = "1" ]; then
         log "Results in $RESULTS_DIR/"
         ls -la "$RESULTS_DIR/"
         exit 1
     fi
 else
+    if [ "$REQUIRE_NAVIT_LOG" = "1" ]; then
+        log "FAIL: navit.log not found in shared folder"
+        exit 1
+    fi
     log "WARNING: navit.log not found in shared folder"
 fi
 

@@ -1,0 +1,144 @@
+name: WinCE Regression Matrix
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/build.yml
+      - .github/workflows/wince-regression.yml
+      - Toolchain/mingw.cmake
+      - navit/graphics.c
+      - navit/main.c
+      - navit/maps/**
+      - navit/support/libc/**
+      - navit/xmlconfig.c
+      - scripts/build_wince.sh
+      - scripts/ci/wince-build-ref.sh
+      - scripts/ci/wince-setup-emulator.sh
+      - scripts/ci/wince-smoke-test.sh
+      - scripts/setup_wince.sh
+  push:
+    paths:
+      - .github/workflows/build.yml
+      - .github/workflows/wince-regression.yml
+      - Toolchain/mingw.cmake
+      - navit/graphics.c
+      - navit/main.c
+      - navit/maps/**
+      - navit/support/libc/**
+      - navit/xmlconfig.c
+      - scripts/build_wince.sh
+      - scripts/ci/wince-build-ref.sh
+      - scripts/ci/wince-setup-emulator.sh
+      - scripts/ci/wince-smoke-test.sh
+      - scripts/setup_wince.sh
+
+jobs:
+  regression_case:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: v0.5.6
+            ref: refs/tags/v0.5.6
+            expected: pass
+          - label: upstream-trunk
+            ref: refs/remotes/upstream/trunk
+            expected: fail
+          - label: head
+            ref: HEAD
+            expected: pass
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - run: git config --global --add safe.directory $GITHUB_WORKSPACE
+
+      - name: Fetch upstream refs
+        run: |
+          git remote add upstream https://github.com/navit-gps/navit.git 2>/dev/null || true
+          git remote set-url upstream https://github.com/navit-gps/navit.git
+          git fetch --force --tags upstream trunk
+
+      - name: Build WinCE package for ${{ matrix.label }}
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
+            -w "$GITHUB_WORKSPACE" \
+            ghcr.io/enlyze/windows-ce-build-environment-arm \
+            bash -lc "git config --global --add safe.directory '$GITHUB_WORKSPACE' && bash scripts/ci/wince-build-ref.sh '${{ matrix.ref }}' '${{ matrix.label }}'"
+
+      - name: Upload built package
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: wince-regression-package-${{ matrix.label }}
+          path: wince-ref-artifacts/${{ matrix.label }}
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Cache Device Emulator and ROM
+        id: cache-emu
+        uses: actions/cache@v4
+        with:
+          path: emulator
+          key: wince-emu-v2
+
+      - name: Download and extract Device Emulator + ROM
+        if: steps.cache-emu.outputs.cache-hit != 'true'
+        run: bash scripts/ci/wince-setup-emulator.sh emulator
+
+      - name: Install Wine and display tools
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo mkdir -pm755 /etc/apt/keyrings
+          sudo wget -O /etc/apt/keyrings/winehq-archive.key \
+            https://dl.winehq.org/wine-builds/winehq.key
+          sudo wget -NP /etc/apt/sources.list.d/ \
+            "https://dl.winehq.org/wine-builds/ubuntu/dists/$(lsb_release -cs)/winehq-$(lsb_release -cs).sources"
+          sudo apt-get update
+          sudo apt-get install -y --install-recommends winehq-stable || \
+            sudo apt-get install -y wine wine32 wine64
+          sudo apt-get install -y xvfb imagemagick xdotool
+
+      - name: Run WinCE smoke test
+        id: smoke
+        run: |
+          set +e
+          bash scripts/ci/wince-smoke-test.sh
+          status=$?
+          if [ "$status" -eq 0 ]; then
+            echo "actual=pass" >> "$GITHUB_OUTPUT"
+          else
+            echo "actual=fail" >> "$GITHUB_OUTPUT"
+          fi
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+        env:
+          NAVIT_DIR: wince-ref-artifacts/${{ matrix.label }}
+          SMOKE_TIMEOUT: "180"
+          REQUIRE_NAVIT_LOG: "1"
+          FAIL_ON_MAP_LOAD_ERROR: "1"
+
+      - name: Compare outcome
+        run: |
+          expected="${{ matrix.expected }}"
+          if [ "${{ matrix.label }}" = "upstream-trunk" ] && \
+             { [ "${{ github.ref }}" = "refs/heads/trunk" ] || [ "${{ github.ref }}" = "refs/heads/master" ]; }; then
+            expected="pass"
+          fi
+          echo "ref=${{ matrix.ref }}"
+          echo "expected=$expected"
+          echo "actual=${{ steps.smoke.outputs.actual }}"
+          test "${{ steps.smoke.outputs.actual }}" = "$expected"
+
+      - name: Upload smoke test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: wince-regression-results-${{ matrix.label }}
+          path: smoke-results/
+          if-no-files-found: warn
+          retention-days: 14

@@ -263,6 +263,8 @@ jobs:
         run: bash scripts/ci/wince-smoke-test.sh
         env:
           SMOKE_TIMEOUT: "180"
+          REQUIRE_NAVIT_LOG: "1"
+          FAIL_ON_MAP_LOAD_ERROR: "1"
 
       - name: Upload smoke test results
         if: always()
@@ -312,6 +314,8 @@ jobs:
         env:
           SMOKE_TIMEOUT: "180"
           ROTATE: "1"
+          REQUIRE_NAVIT_LOG: "1"
+          FAIL_ON_MAP_LOAD_ERROR: "1"
 
       - name: Upload smoke test results
         if: always()
