@@ -30,10 +30,14 @@ git worktree add --force --detach "$WORKTREE_DIR" "$TARGET_REF"
 cd "$WORKTREE_DIR"
 echo "[wince-build-ref] Building $(git rev-parse HEAD) from $TARGET_REF"
 
-bash scripts/setup_wince.sh
+mkdir -p /var/lib/apt/lists/partial
+apt-get update
+apt-get install -y xsltproc cmake gettext git zip librsvg2-bin gcab
 
-SYSTEM_NAME="$(sed -n 's/.*-DCMAKE_SYSTEM_NAME=\([^[:space:]]*\).*/\1/p' scripts/build_wince.sh | head -1)"
-[ -n "$SYSTEM_NAME" ] || SYSTEM_NAME="WindowsCE"
+# Older refs used WindowsCETest, which does not work with the current WinCE
+# build image. Use one shared system name so the regression job compares the
+# source revisions, not historical CMake platform quirks.
+SYSTEM_NAME="WindowsCE"
 
 mkdir -p wince
 cd wince
