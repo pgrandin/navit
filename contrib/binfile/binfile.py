@@ -2,6 +2,7 @@
 """Binfile record parsing and Navit-compatible ZIP64 assembly."""
 
 import pathlib
+import hashlib
 import re
 import struct
 import tempfile
@@ -50,12 +51,31 @@ def records(data):
 
 
 class NavitZip:
-    """Small writer matching maptool's offset-only ZIP64 extra fields."""
+    """Forward-only writer matching maptool's offset-only ZIP64 extra fields.
+
+    Output must start at byte zero. Only write() is required of the sink;
+    directory metadata is spooled to disk. A failed write invalidates the output,
+    so callers must discard staged files or abort multipart uploads on failure.
+    """
 
     def __init__(self, output):
         self.out = output
         self.directory = tempfile.TemporaryFile()
         self.count = 0
+        self.offset = 0
+        self.finished = False
+        self.pending = False
+
+    def _write(self, data):
+        view = memoryview(data)
+        while view:
+            written = self.out.write(view)
+            if not isinstance(written, int) or not 0 < written <= len(view):
+                raise OSError(
+                    "Output sink made no progress or returned an invalid count"
+                )
+            self.offset += written
+            view = view[written:]
 
     def __enter__(self):
         return self
@@ -64,7 +84,6 @@ class NavitZip:
         self.directory.close()
 
     def add(self, name, data):
-        name = name.encode("ascii")
         if len(data) >= 0xFFFFFFFF:
             raise ValueError("Individual tiles must fit in 32 bits")
         compressor = zlib.compressobj(6, zlib.DEFLATED, -15)
@@ -72,8 +91,53 @@ class NavitZip:
         method = 8
         if len(compressed) >= len(data):
             compressed, method = data, 0
-        crc, offset = zlib.crc32(data), self.out.tell()
-        self.out.write(
+        crc = zlib.crc32(data)
+        self._header(name, method, crc, len(data), len(compressed))
+        self._write(compressed)
+        self.pending = False
+
+    def add_precompressed(
+        self, name, source, *, method, crc, size, compressed_size, sha256
+    ):
+        """Copy a cataloged tile in bounded blocks, verifying its payload hash.
+
+        The catalog must come from a trusted conversion/validation stage and
+        contain final member references, CRC and uncompressed size. SHA-256 covers
+        the compressed payload. This copy stage checks transport integrity; it
+        does not decompress the tile or validate its Navit records.
+        """
+        if not re.fullmatch(r"[0-9a-f]{64}", sha256):
+            raise ValueError("Expected a lowercase SHA-256 payload digest")
+        self._header(name, method, crc, size, compressed_size)
+        remaining, digest = compressed_size, hashlib.sha256()
+        while remaining:
+            block = source.read(min(remaining, 1024 * 1024))
+            if not block or len(block) > remaining:
+                raise ValueError("Invalid compressed tile payload length")
+            remaining -= len(block)
+            digest.update(block)
+            self._write(block)
+        if digest.hexdigest() != sha256:
+            raise ValueError("Compressed tile payload checksum mismatch")
+        self.pending = False
+
+    def _header(self, name, method, crc, size, compressed_size):
+        if self.finished:
+            raise ValueError("Archive is already finished")
+        if self.pending:
+            raise ValueError("Previous member did not complete; discard this archive")
+        name = name.encode("ascii")
+        if not 1 <= len(name) <= 65535:
+            raise ValueError("Invalid member name length")
+        if method not in (0, 8) or not 0 <= crc <= 0xFFFFFFFF:
+            raise ValueError("Invalid compression method or CRC")
+        if not (0 <= size < 0xFFFFFFFF and 0 <= compressed_size < 0xFFFFFFFF):
+            raise ValueError("Individual tiles must fit in 32 bits")
+        if method == 0 and size != compressed_size:
+            raise ValueError("Stored tile sizes must match")
+        offset = self.offset
+        self.pending = True
+        self._write(
             struct.pack(
                 "<I5H3I2H",
                 0x04034B50,
@@ -83,14 +147,13 @@ class NavitZip:
                 0,
                 33,
                 crc,
-                len(compressed),
-                len(data),
+                compressed_size,
+                size,
                 len(name),
                 0,
             )
         )
-        self.out.write(name)
-        self.out.write(compressed)
+        self._write(name)
         extra = struct.pack("<HHQ", 1, 8, offset)
         self.directory.write(
             struct.pack(
@@ -103,8 +166,8 @@ class NavitZip:
                 0,
                 33,
                 crc,
-                len(compressed),
-                len(data),
+                compressed_size,
+                size,
                 len(name),
                 len(extra),
                 0,
@@ -118,12 +181,17 @@ class NavitZip:
         self.count += 1
 
     def finish(self):
-        directory_offset, directory_size = self.out.tell(), self.directory.tell()
+        if self.finished:
+            raise ValueError("Archive is already finished")
+        if self.pending:
+            raise ValueError("Previous member did not complete; discard this archive")
+        self.finished = True
+        directory_offset, directory_size = self.offset, self.directory.tell()
         self.directory.seek(0)
         while block := self.directory.read(1024 * 1024):
-            self.out.write(block)
-        end_offset = self.out.tell()
-        self.out.write(
+            self._write(block)
+        end_offset = self.offset
+        self._write(
             struct.pack(
                 "<IQ2H2I4Q",
                 0x06064B50,
@@ -138,8 +206,8 @@ class NavitZip:
                 directory_offset,
             )
         )
-        self.out.write(struct.pack("<IIQI", 0x07064B50, 0, end_offset, 1))
-        self.out.write(
+        self._write(struct.pack("<IIQI", 0x07064B50, 0, end_offset, 1))
+        self._write(
             struct.pack(
                 "<I4H2IH",
                 0x06054B50,

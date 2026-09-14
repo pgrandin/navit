@@ -63,6 +63,15 @@ through a new global root. Country indexes are also exposed from that global
 root so town search can traverse them. Central-directory entries have the fixed
 stride and offset-only ZIP64 extra fields expected by Navit.
 
+`NavitZip` also accepts forward-only output sinks, including sinks which return
+short writes. Its `add_precompressed` API copies a final tile payload in at most
+1 MiB reads and checks its SHA-256 against a trusted tile catalog. The catalog
+must already contain final member references, compression method, CRC and sizes;
+this copying stage does not decode or validate tile contents. The central
+directory is spooled to a temporary disk file. Abort/discard the output on any
+failure. This is a primitive for streaming planet assembly; the existing merge
+CLI still needs local inputs, a topology database and a staged local output.
+
 Replaced routing records become same-length `type_none` records, preserving other
 item offsets. Canonical segments are appended to a source tile that previously
 contained the enclosing segment; they therefore remain reachable through its
