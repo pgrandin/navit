@@ -39,6 +39,8 @@ Builds:
     output: build/outputs/apk/release/navit-*.apk
     rm:
       - navit/support/espeak/espeak-data/*
+      # OSM conversion test data is not used by the Android application build.
+      - contrib/binfile/tests/data/monaco-260913.osm.gz
     ndk: 27.3.13750724
 
 MaintainerNotes: |-
