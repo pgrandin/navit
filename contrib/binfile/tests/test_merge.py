@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from binfile import NavitZip, definitions, records
 from merge import SOURCE, merge
 from overlap import MergeError, attribute_data, coordinates, item
+from validate_chunks import feature_records
 
 A, I = definitions(SOURCE / "attr_def.h", "ATTR"), definitions(
     SOURCE / "item_def.h", "ITEM"
@@ -225,6 +226,74 @@ class MergeTests(unittest.TestCase):
                 merge([path], self.root / "out.bin")
             self.assertFalse((self.root / "out.bin").exists())
 
+    def test_identical_self_intersecting_copies_need_no_reconstruction(self):
+        loop = road(10, [1, 2, 4, 2, 3])
+        self.assert_merge([loop], [loop, road(20, [3, 5])], [loop, road(20, [3, 5])])
+
+    def test_parallel_paths_are_allowed_without_ambiguous_restrictions(self):
+        parallel = road(11, [1, 4, 3])
+        normalized = [road(10, [1, 2]), road(10, [2, 3]), parallel, road(20, [2, 4])]
+        self.assert_merge([road(10, [1, 2, 3]), parallel], normalized, normalized)
+
+    def test_restriction_on_ambiguous_parallel_leg_still_fails(self):
+        parallel = road(11, [1, 4, 3])
+        left = self.bin(
+            "left",
+            [road(10, [1, 2, 3]), parallel, road(30, [3, 5]), restriction([1, 3, 5])],
+        )
+        right = self.bin(
+            "right",
+            [
+                road(10, [1, 2]),
+                road(10, [2, 3]),
+                parallel,
+                road(20, [2, 4]),
+                road(30, [3, 5]),
+            ],
+        )
+        with self.assertRaisesRegex(MergeError, "unambiguous source road"):
+            merge([left, right], self.root / "out.bin")
+        self.assertFalse((self.root / "out.bin").exists())
+
+    def test_feature_identity_preserves_distinct_coincident_pois(self):
+        first = item(
+            I["poi_tree"], [POINTS[1]], {A["osm_nodeid"]: struct.pack("<Q", 1)}
+        )
+        second = item(
+            I["poi_tree"], [POINTS[1]], {A["osm_nodeid"]: struct.pack("<Q", 2)}
+        )
+        left = self.bin("left", [first])
+        right = self.bin("right", [first, second])
+        output = self.root / "out.bin"
+        report = merge([left, right], output)
+        self.assertEqual(feature_records(right), feature_records(output))
+        self.assertEqual(report["counts"]["features_in"], 3)
+        self.assertEqual(report["counts"]["features_out"], 2)
+
+    def test_conflicting_feature_geometry_leaves_no_output(self):
+        attrs = {A["osm_nodeid"]: struct.pack("<Q", 1)}
+        left = self.bin("left", [item(I["poi_tree"], [POINTS[1]], attrs)])
+        right = self.bin("right", [item(I["poi_tree"], [POINTS[2]], attrs)])
+        with self.assertRaisesRegex(MergeError, "feature geometry"):
+            merge([left, right], self.root / "out.bin")
+        self.assertFalse((self.root / "out.bin").exists())
+
+    def test_feature_multiplicity_and_repeated_polygon_holes_are_preserved(self):
+        area = item(
+            I["poly_building"],
+            [POINTS[n] for n in [1, 2, 4, 1]],
+            {A["osm_relationid"]: struct.pack("<Q", 100)},
+        )
+        for point in [(1500, 1200), (1700, 1300)]:
+            area += struct.pack("<IIIii", 4, A["poly_hole"], 1, *point)
+        area = struct.pack("<I", len(area) // 4 - 1) + area[4:]
+        left = self.bin("left", [area, area])
+        right = self.bin("right", [area, area, road(20, [3, 5])])
+        output = self.root / "out.bin"
+        report = merge([left, right], output)
+        self.assertEqual(feature_records(right), feature_records(output))
+        self.assertEqual(report["counts"]["features_out"], 2)
+
     def test_invalid_tile_reference_leaves_no_output(self):
         path = self.bin(
             "bad",
@@ -299,7 +368,7 @@ class NativeTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.compiler_tmp.cleanup()
 
-    def osm(self, name, ways, restrictions=()):
+    def osm(self, name, ways, restrictions=(), extra_points=None):
         directory = self.root / name
         directory.mkdir()
         osm = ET.Element("osm", version="0.6")
@@ -310,6 +379,7 @@ class NativeTests(unittest.TestCase):
             4: (7.415, 43.740),
             5: (7.430, 43.730),
         }
+        points.update(extra_points or {})
         for number, (lon, lat) in points.items():
             ET.SubElement(osm, "node", id=str(number), lat=str(lat), lon=str(lon))
         for number, nodes, tags in ways:
@@ -375,6 +445,22 @@ class NativeTests(unittest.TestCase):
             reference = self.route(east, start, end)
             self.assertEqual(reference["found"], 1, reference)
             self.assertEqual(reference, self.route(output, start, end))
+
+    def test_distinct_osm_nodes_at_same_coordinate_do_not_create_interior_turn(self):
+        through = (10, [1, 2, 3], {})
+        branch = (20, [6, 4], {})
+        points = {
+            6: (7.415, 43.730)
+        }  # Same position as node 2, different OSM identity.
+        west = self.osm("west", [through], extra_points=points)
+        east = self.osm("east", [through, branch], extra_points=points)
+        output = self.root / "merged.bin"
+        merge([west, east], output)
+        self.assertEqual(routing(east), routing(output))
+        start, end = (7.411, 43.730), (7.415, 43.738)
+        reference = self.route(east, start, end)
+        self.assertEqual(reference["found"], 0, reference)
+        self.assertEqual(reference, self.route(output, start, end))
 
     def test_real_restriction_rebase_and_native_route(self):
         roads = [(10, [1, 2, 3], {}), (20, [3, 5], {})]

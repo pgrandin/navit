@@ -2240,9 +2240,7 @@ static void osm_town_relations_to_poly(GList *boundaries, FILE *towns_poly) {
                     a = osm_tag_value(b->ib, "name");
                     if (a)
                         item_bin_add_attr_string(ib, attr_label, a);
-                    a = osm_tag_value(b->ib, "osm_relationid");
-                    if (a)
-                        item_bin_add_attr_longlong(ib, attr_osm_relationid, atol(a));
+                    item_bin_copy_attr(ib, b->ib, attr_osm_relationid);
                     item_bin_write(ib, towns_poly);
                 }
                 s = g_list_next(s);
@@ -2305,7 +2303,6 @@ void osm_process_towns(FILE *in, FILE *boundaries, FILE *ways, char *suffix) {
         while (l) {
             struct town_country *tc = l->data;
             char *is_in;
-            long long *nodeid;
             char *town_name = NULL;
             int i;
 
@@ -2327,10 +2324,9 @@ void osm_process_towns(FILE *in, FILE *boundaries, FILE *ways, char *suffix) {
             if ((is_in = item_bin_get_attr(ib, attr_osm_is_in, NULL)) != NULL)
                 item_bin_remove_attr(ib, is_in);
 
-            nodeid = item_bin_get_attr(ib, attr_osm_nodeid, NULL);
-
-            if (nodeid)
-                item_bin_remove_attr(ib, nodeid);
+            /* Retain OSM identity in search records so independently converted
+             * extracts can reconcile the same town without guessing from its
+             * label and projected coordinates. */
 
             /* Treat district like a town, if we did not find the town it belongs to */
             if (!item_bin_get_attr(ib, attr_town_name, NULL)) {

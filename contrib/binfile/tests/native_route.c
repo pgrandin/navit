@@ -49,8 +49,15 @@ int main(int argc, char **argv) {
   struct vehicleprofile *profile = vehicleprofile_new(NULL, profile_attrs);
   if (!profile)
     return 4;
-  enum item_type road_types[] = {type_street_1_city, type_street_2_city,
-                                 type_street_service, type_none};
+  enum item_type road_types[] = {
+      type_street_0,       type_street_1_city,       type_street_2_city,
+      type_street_3_city,  type_street_4_city,       type_highway_city,
+      type_street_1_land,  type_street_2_land,       type_street_3_land,
+      type_street_4_land,  type_street_n_lanes,      type_highway_land,
+      type_ramp,           type_roundabout,          type_ferry,
+      type_track_paved,    type_track_gravelled,     type_track_unpaved,
+      type_track_ground,   type_track_grass,         type_living_street,
+      type_street_service, type_street_parking_lane, type_none};
   struct attr types = {.type = attr_item_types, .u.item_types = road_types};
   struct attr speed = {.type = attr_speed, .u.num = 50};
   struct attr maxspeed = {.type = attr_maxspeed, .u.num = 50};
@@ -77,8 +84,22 @@ int main(int argc, char **argv) {
   struct attr length, status;
   int found = route_get_attr(route, attr_destination_length, &length, NULL);
   route_get_attr(route, attr_route_status, &status, NULL);
-  printf("{\"found\":%d,\"length\":%ld,\"status\":%ld}\n", found,
+  printf("{\"found\":%d,\"length\":%ld,\"status\":%ld,\"coordinates\":[", found,
          found ? length.u.num : -1L, status.u.num);
+  struct map_rect *rect = map_rect_new(route_get_map(route), NULL);
+  struct item *it;
+  int first = 1;
+  while (rect && (it = map_rect_get_item(rect))) {
+    if (it->type != type_street_route)
+      continue;
+    while (item_coord_get(it, &c, 1)) {
+      printf("%s[%d,%d]", first ? "" : ",", c.x, c.y);
+      first = 0;
+    }
+  }
+  if (rect)
+    map_rect_destroy(rect);
+  printf("]}\n");
   route_destroy(route);
   return 0;
 }

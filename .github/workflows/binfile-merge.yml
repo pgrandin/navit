@@ -22,6 +22,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - name: Install build dependencies
@@ -36,3 +37,17 @@ jobs:
         env:
           NAVIT_BUILD: ${{ github.workspace }}/build-merge
         run: python3 -m unittest discover -s contrib/binfile/tests -v
+      - name: Compare adjoining real OSM chunks, searches and ZIP64 offsets
+        run: python3 contrib/binfile/validate_chunks.py --build build-merge --output acceptance --large-offsets
+      - name: Keep the tested map and acceptance report
+        uses: actions/upload-artifact@v7
+        with:
+          name: adjoining-chunk-proof
+          path: |
+            acceptance/combined.bin
+            acceptance/reference/map.bin
+            acceptance/validation.json
+            acceptance/*/resources.txt
+            acceptance/*/maptool.log
+          if-no-files-found: error
+          retention-days: 7

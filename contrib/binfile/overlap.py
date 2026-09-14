@@ -40,6 +40,21 @@ def item(kind, coords, attrs):
     return struct.pack("<III", len(body) // 4 + 2, kind, len(coords) * 2) + body
 
 
+def record_identity(data, ignored):
+    """Comparable record retaining repeated attributes such as polygon holes."""
+    _, _, kind, attributes = next(records(data))
+    coords = coordinates(data)
+    attrs = sorted(
+        (atype, data[pos : pos + size])
+        for atype, pos, size in attributes
+        if atype not in ignored
+    )
+    body = b"".join(struct.pack("<ii", *c) for c in coords)
+    for atype, value in attrs:
+        body += struct.pack("<II", 1 + len(value) // 4, atype) + value
+    return struct.pack("<III", len(body) // 4 + 2, kind, len(coords) * 2) + body
+
+
 def tombstone(data):
     """Keep word offsets valid while making an old item non-renderable/unroutable."""
     length = len(data) // 4 - 1
@@ -61,6 +76,8 @@ class Overlap:
             CREATE TABLE roads (way INTEGER, source INTEGER, tile INTEGER, offset INTEGER, data BLOB);
             CREATE TABLE areas (relation INTEGER, source INTEGER, tile INTEGER, offset INTEGER, data BLOB);
             CREATE TABLE restrictions (source INTEGER, tile INTEGER, offset INTEGER, data BLOB);
+            CREATE TABLE features (identity BLOB, kind INTEGER, source INTEGER, tile INTEGER,
+                                   offset INTEGER, data BLOB);
             CREATE TABLE replacements (source INTEGER, tile INTEGER, offset INTEGER, data BLOB,
                                        PRIMARY KEY(source,tile,offset));
             CREATE TABLE tails (source INTEGER, tile INTEGER, data BLOB);
@@ -123,6 +140,36 @@ class Overlap:
                     (source, tile, start, record),
                 )
                 self.counts["restrictions_in"] += 1
+            elif kind not in {
+                self.items[name]
+                for name in ("none", "submap", "countryindex", "map_information")
+            }:
+                identity = sorted(
+                    (atype, data[pos : pos + size])
+                    for atype, pos, size in attributes
+                    if atype
+                    in {
+                        self.attrs[name]
+                        for name in ("osm_nodeid", "osm_wayid", "osm_relationid")
+                    }
+                )
+                if identity:
+                    if any(len(value) != 8 for _, value in identity):
+                        raise MergeError("Invalid OSM feature identity")
+                    if any(
+                        atype == self.attrs["zipfile_ref"] for atype, _, _ in attributes
+                    ):
+                        raise MergeError("Feature search references require rebuilding")
+                    key = b"".join(
+                        struct.pack("<I", atype) + value for atype, value in identity
+                    )
+                    self.db.execute(
+                        "INSERT INTO features VALUES (?,?,?,?,?,?)",
+                        (key, kind, source, tile, start, record),
+                    )
+                    self.counts["features_in"] += 1
+                else:
+                    self.counts["unidentified_features_preserved"] += 1
 
     @staticmethod
     def pack(point):
@@ -142,13 +189,31 @@ class Overlap:
             args[:3],
         ).fetchone()
         if old and old != args[3:]:
-            raise MergeError("Ambiguous routing paths with the same endpoints")
+            # Parallel paths and closed roads can legitimately share endpoints.
+            # This lookup is needed only when rebasing a restriction. Remember
+            # ambiguity and reject it if a restriction actually uses this leg.
+            self.db.execute(
+                "UPDATE endpoints SET segments=0 WHERE source=? AND start=? AND end=?",
+                args[:3],
+            )
         self.db.execute("INSERT OR IGNORE INTO endpoints VALUES (?,?,?,?,?,?)", args)
 
     def normalize_way(self, way, rows):
+        ignored = {self.attrs["debug"], self.attrs["order"]}
+        versions = collections.defaultdict(collections.Counter)
+        for source, _, _, data in rows:
+            attrs = attribute_data(data)
+            identity = item(
+                struct.unpack_from("<I", data, 4)[0],
+                coordinates(data),
+                {k: v for k, v in attrs.items() if k not in ignored},
+            )
+            versions[source][identity] += 1
+        owner = next(iter(versions))
         # Preserve non-overlapping ways byte-for-byte, including roundabouts and
-        # legitimate self-intersections. Only overlapping copies need agreement.
-        if len({row[0] for row in rows}) == 1:
+        # legitimate self-intersections. Identical segment multisets also need
+        # no reconstruction: retain one source, including its multiplicities.
+        if all(version == versions[owner] for version in versions.values()):
             for source, tile, offset, data in rows:
                 coords = coordinates(data)
                 if len(coords) < 2:
@@ -160,10 +225,15 @@ class Overlap:
                         "INSERT OR IGNORE INTO vertices VALUES (?,?,?)",
                         (self.pack(point), way, source),
                     )
-                self.counts["roads_out"] += 1
+                if source == owner:
+                    self.counts["roads_out"] += 1
+                else:
+                    self.db.execute(
+                        "INSERT INTO replacements VALUES (?,?,?,?)",
+                        (source, tile, offset, tombstone(data)),
+                    )
             return
         parsed, cuts, signatures = [], set(), collections.defaultdict(dict)
-        ignored = {self.attrs["debug"], self.attrs["order"]}
         for source, tile, offset, data in rows:
             coords = coordinates(data)
             if len(coords) < 2:
@@ -248,7 +318,7 @@ class Overlap:
             "SELECT near_start,near_end,segments FROM endpoints WHERE source=? AND start=? AND end=?",
             (source, self.pack(start), self.pack(end)),
         ).fetchone()
-        if leg is None:
+        if leg is None or leg[2] == 0:
             raise MergeError("Restriction leg has no unambiguous source road")
         return struct.unpack("<ii", leg[0]), struct.unpack("<ii", leg[1]), leg[2]
 
@@ -262,6 +332,33 @@ class Overlap:
                 (way,),
             ).fetchall()
             self.normalize_way(way, rows)
+        self.db.execute(
+            "CREATE INDEX features_identity ON features(identity,kind,source,tile,offset)"
+        )
+        ignored = {self.attrs["order"], self.attrs["debug"]}
+        for identity, kind in self.db.execute(
+            "SELECT DISTINCT identity,kind FROM features ORDER BY identity,kind"
+        ):
+            rows = self.db.execute(
+                "SELECT source,tile,offset,data FROM features WHERE identity=? AND kind=? ORDER BY source,tile,offset",
+                (identity, kind),
+            ).fetchall()
+            versions = collections.defaultdict(collections.Counter)
+            for source, _, _, data in rows:
+                versions[source][record_identity(data, ignored)] += 1
+            owner = next(iter(versions))
+            if any(version != versions[owner] for version in versions.values()):
+                raise MergeError(
+                    "Overlapping feature geometry/attributes differ; rebuild complete features from one snapshot"
+                )
+            for source, tile, offset, data in rows:
+                if source == owner:
+                    self.counts["features_out"] += 1
+                else:
+                    self.db.execute(
+                        "INSERT INTO replacements VALUES (?,?,?,?)",
+                        (source, tile, offset, tombstone(data)),
+                    )
         self.db.execute("CREATE INDEX areas_relation ON areas(relation)")
         for (relation,) in self.db.execute(
             "SELECT DISTINCT relation FROM areas ORDER BY relation"

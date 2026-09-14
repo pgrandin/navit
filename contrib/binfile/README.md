@@ -1,8 +1,9 @@
 # Merge regional OSM binfiles
 
 `merge.py` reconciles compatible copies of OSM roads before assembling one
-Navit-readable binfile. It requires Python 3.11 or later, uses only the standard
-library, and works with an unmodified Navit reader.
+Navit-readable binfile. It requires Python 3.11 or later and uses only the standard
+library. The output format works with an unmodified Navit reader. Complete address
+search validation also needs the reader fixes on this branch, described below.
 
 ```sh
 python3 contrib/binfile/merge.py -o combined.bin region-a.bin region-b.bin
@@ -39,12 +40,27 @@ a true shared node from separate nodes which project to the same coordinate
 requires rebuilding with original OSM data. This conservative rule can reject
 otherwise valid input sets.
 
-Non-overlapping ways are preserved byte-for-byte. Overlapping ways with repeated
-interior coordinates, ambiguous endpoint paths, partially clipped geometry or
-conflicting versions are refused. Relation-based routing surfaces, such as
+Non-overlapping ways are preserved byte-for-byte. Identical segment multisets
+across sources are deduplicated without reconstruction, including loops and
+self-intersections. Repeated interior coordinates are still refused when splits
+differ and reconstruction would be ambiguous. Parallel roads sharing endpoints
+are allowed; restrictions using an ambiguous endpoint lookup are refused.
+Partially clipped geometry or conflicting versions are refused. Relation-based routing surfaces, such as
 pedestrian multipolygons with holes, are preserved intact and only deduplicated
-when their complete sets of records are identical. Arbitrary polygon/coastline
-stitching and non-routing feature deduplication are not implemented.
+when their complete sets of records are identical.
+
+POIs, buildings, other non-routing ways, town/search records and boundary polygons
+are deduplicated by retained OSM identity and item type. Complete record multisets
+must agree across sources, ignoring only debug/order attributes; repeated polygon
+holes and within-source multiplicities are preserved. Distinct OSM entities at
+the same coordinate remain distinct. Inconsistent or partially clipped copies
+are rejected. Anonymous legacy features are retained and counted in the report;
+their identities cannot safely be inferred. Arbitrary polygon/coastline repair
+is not implemented.
+
+Maptool on this branch retains town node IDs in search records and copies boundary
+relation IDs from the typed attribute instead of looking for an OSM tag named
+`osm_relationid`. Rebuild inputs with this maptool to retain those identities.
 
 Contraction-hierarchy maps, AF_SEGMENTED roads, and maps using `item_id` or
 `zipfile_ref_block` indexes are refused. These require rebuilding indexes or
@@ -52,9 +68,12 @@ additional topology handling. A refused merge does not create the requested
 output; existing outputs are never overwritten.
 
 This is not a complete planet rebuild: it cannot recover missing regions or
-relations, and planet-scale resource use and offsets beyond 4 GiB have not been
-validated. Do not publish output as a complete planet without coverage and
-source-provenance checks.
+relations, and planet-scale resource use has not been validated. ZIP64 member and
+directory offsets beyond 4 GiB are tested with a sparse file, which does not test
+planet-sized topology or payload volume. Navit's current route engine explicitly
+ignores four-coordinate via-way restrictions; preserving their records does not
+establish that they are enforced. Do not publish output as a complete, fully
+validated planet on the strength of the small-fixture tests.
 
 ## File layout
 
@@ -99,3 +118,40 @@ As an additional smoke test, the 2026-09-14 Monaco, Liechtenstein and Andorra
 release maps retained all 63,306 street items counted by `item_is_street`, all
 269 turn restrictions, all 1,333,105 coordinates, and town-search counts of
 10, 93 and 158 respectively. Those regions do not exercise adjoining borders.
+
+## Reproducible real adjoining-chunk proof
+
+```sh
+python3 contrib/binfile/validate_chunks.py --build build-merge --output acceptance --large-offsets
+```
+
+This offline test builds the checked-in Monaco OSM snapshot once as a reference
+and twice with overlapping west/east way sets. Their union covers all 6,248 ways:
+1,426 shared, 2,959 west-only and 1,863 east-only. Both chunks receive all snapshot
+nodes/relations and available relation-member ways as context. This is deliberately
+a small correctness fixture, not the bounded planet dependency planner.
+
+The assembled `combined.bin` matches all 13,951 compiled feature records including
+attributes and polygon holes, ignoring only layout metadata, inactive placeholders
+and debug/order attributes. Native traversal matches 13,928 reachable feature
+records. Native country searches (France and Monaco) yield the same 10 towns,
+2,748 street results and 3,962 house results. Street/house totals include repeated
+queries under different towns; they are not counts of unique real-world addresses.
+Six cross-boundary car routes have identical full coordinate sequences and lengths
+to the reference. The ZIP64 variant repeats these checks with every referenced
+member beyond 4 GiB, allocating only about 385 KiB locally.
+
+The address tests exposed two existing binfile-reader bugs, fixed on this branch:
+house searches could compare an absent parent street name (or an uninitialized
+indexed street attribute), and a boundary check exhausted the coordinate cursor
+before address deduplication, making distinct address positions collapse to the
+same key. The unmodified reader was separately checked for feature traversal,
+town/street search and the six routes at normal and large offsets; full house
+searches require the fixes.
+
+The command retains the inputs, reference, combined map, logs and `validation.json`.
+Its report records artifact hashes and per-maptool RSS/runtime measurements.
+These measurements exclude the Python coordinator and do not establish the
+whole-job planet budget. `certifies_planet` is explicitly false and remaining
+gaps are listed. CI runs this proof on standard Actions runners and uploads the
+small maps/report; the sparse 4 GiB test file is intentionally excluded.
