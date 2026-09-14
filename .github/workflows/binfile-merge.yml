@@ -1,0 +1,38 @@
+name: Binfile overlap tests
+
+on:
+  push:
+    paths:
+      - 'contrib/binfile/**'
+      - '.github/workflows/binfile-merge.yml'
+  pull_request:
+    paths:
+      - 'contrib/binfile/**'
+      - 'navit/maptool/**'
+      - 'navit/map/binfile/**'
+      - 'navit/route.c'
+      - 'navit/attr_def.h'
+      - 'navit/item_def.h'
+      - '.github/workflows/binfile-merge.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config libglib2.0-dev zlib1g-dev libprotobuf-c-dev protobuf-c-compiler
+      - name: Build maptool and the production binfile reader
+        run: |
+          cmake -S . -B build-merge -G Ninja -DSAMPLE_MAP=OFF -DDISABLE_QT=ON -DDISABLE_CXX=ON -DSVG2PNG=OFF
+          cmake --build build-merge --target maptool map_binfile -j 4
+      - name: Check merged geometry and native routing
+        env:
+          NAVIT_BUILD: ${{ github.workspace }}/build-merge
+        run: python3 -m unittest discover -s contrib/binfile/tests -v
