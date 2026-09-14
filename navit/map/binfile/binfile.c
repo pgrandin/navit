@@ -1543,13 +1543,19 @@ static struct item *binmap_search_get_item(struct map_search_priv *map_search) {
                 if ((has_house_number || it->type == type_house_number_interpolation_even
                      || it->type == type_house_number_interpolation_odd
                      || it->type == type_house_number_interpolation_all
-                     || (map_search->mode == 1 && item_is_street(*it)) || it->type == type_house_number)
+                    || (map_search->mode == 1 && item_is_street(*it)) || it->type == type_house_number)
                     && !(map_search->boundaries && !item_inside_poly_list(it, map_search->boundaries))) {
+                    /* The boundary test consumes coordinates. Duplicate keys
+                     * must use the address location, not an exhausted cursor
+                     * which makes distinct addresses share the (0,0) key. */
+                    binfile_coord_rewind(it->priv_data);
                     if (has_house_number) {
                         struct attr at2;
-                        if ((binfile_attr_get(it->priv_data, attr_street_name, &at2) || map_search->mode != 2)
-                            && !linguistics_compare(at.u.str, map_search->search.u.str, mode)
-                            && !strcmp(at2.u.str, map_search->parent_name)) {
+                        if ((map_search->mode != 2
+                             || (map_search->parent_name
+                                 && binfile_attr_get(it->priv_data, attr_street_name, &at2)
+                                 && !strcmp(at2.u.str, map_search->parent_name)))
+                            && !linguistics_compare(at.u.str, map_search->search.u.str, mode)) {
                             if (!duplicate(map_search, it, attr_house_number, 0)) {
                                 binfile_attr_rewind(it->priv_data);
                                 return it;
@@ -1557,8 +1563,10 @@ static struct item *binmap_search_get_item(struct map_search_priv *map_search) {
                         }
                     } else {
                         struct attr at2;
-                        if ((binfile_attr_get(it->priv_data, attr_street_name, &at2) || map_search->mode != 2)
-                            && !strcmp(at2.u.str, map_search->parent_name)) {
+                        if (map_search->mode != 2
+                            || (map_search->parent_name
+                                && binfile_attr_get(it->priv_data, attr_street_name, &at2)
+                                && !strcmp(at2.u.str, map_search->parent_name))) {
                             if (!duplicate(map_search, it, attr_house_number_interpolation_no_ends_incrmt_2, 0)) {
                                 binfile_attr_rewind(it->priv_data);
                                 return it;
