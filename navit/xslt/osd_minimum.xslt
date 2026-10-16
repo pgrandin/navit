@@ -23,9 +23,9 @@
       <xsl:text>&#x0A;        </xsl:text>
       <osd type="toggle_announcer" icon_src="%s" x="{round(-(number($ICON_MEDIUM)+8*number($OSD_SIZE)))}" y="{round(-(number($ICON_MEDIUM)+8*number($OSD_SIZE))-94*number($OSD_SIZE))}" w="{round(number($ICON_MEDIUM))}" h="{round(number($ICON_MEDIUM))}"/>
       <xsl:text>&#x0A;        </xsl:text>
-      <osd type="button" src="zoom_manual" command="autozoom_active=0" x="{round(8*number($OSD_SIZE))}" y="{-round(number($ICON_MEDIUM)+22*number($OSD_SIZE))}" w="{round(number($ICON_MEDIUM))}" h="{round(number($ICON_MEDIUM))}" osd_configuration="1" use_overlay="{$OSD_USE_OVERLAY}" enable_expression="autozoom_active!=0"/>
+      <osd type="button" src="zoom_manual" command="autozoom_active=0;gui.set(&quot;navit.autozoom_active=*&quot;,0)" x="{round(8*number($OSD_SIZE))}" y="{-round(number($ICON_MEDIUM)+22*number($OSD_SIZE))}" w="{round(number($ICON_MEDIUM))}" h="{round(number($ICON_MEDIUM))}" osd_configuration="1" use_overlay="{$OSD_USE_OVERLAY}" enable_expression="autozoom_active!=0"/>
       <xsl:text>&#x0A;        </xsl:text>
-      <osd type="button" src="zoom_auto" command="autozoom_active=1" x="{round(8*number($OSD_SIZE))}" y="{-round(number($ICON_MEDIUM)+22*number($OSD_SIZE))}" w="{round(number($ICON_MEDIUM))}" h="{round(number($ICON_MEDIUM))}" osd_configuration="1" use_overlay="{$OSD_USE_OVERLAY}" enable_expression="autozoom_active==0"/>
+      <osd type="button" src="zoom_auto" command="autozoom_active=1;gui.set(&quot;navit.autozoom_active=*&quot;,1)" x="{round(8*number($OSD_SIZE))}" y="{-round(number($ICON_MEDIUM)+22*number($OSD_SIZE))}" w="{round(number($ICON_MEDIUM))}" h="{round(number($ICON_MEDIUM))}" osd_configuration="1" use_overlay="{$OSD_USE_OVERLAY}" enable_expression="autozoom_active==0"/>
       <xsl:text>&#x0A;        </xsl:text>
       <osd type="button" src="zoom_in" command="zoom_in()" x="{round((number($ICON_MEDIUM)+8*number($OSD_SIZE))+8*number($OSD_SIZE))}" y="{-round(number($ICON_MEDIUM)+22*number($OSD_SIZE))}" w="{round(number($ICON_MEDIUM))}" h="{round(number($ICON_MEDIUM))}" osd_configuration="1" use_overlay="{$OSD_USE_OVERLAY}"/>
       <xsl:text>&#x0A;        </xsl:text>
