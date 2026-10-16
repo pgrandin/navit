@@ -16,5 +16,14 @@ launch(){ adb shell monkey -p $PKG -c android.intent.category.LAUNCHER 1; sleep 
 tap(){ adb shell input tap $1 $2; sleep 4; shot $3; }
 launch; shot launched
 tap 889 1568 welcome_ok
-tap 540 1170 menu
+to_display(){ tap 540 1170 ${1}_menu; tap 667 1030 ${1}_settings; tap 404 1147 ${1}_display; }
+to_display a
+tap 386 1263 a_after_3d_tap
+adb shell am force-stop $PKG; sleep 2
+launch; shot b_relaunched
+to_display b          # expect the toggle to read "2D" now
+tap 386 1263 b_after_2d_tap
+adb shell am force-stop $PKG; sleep 2
+launch; shot c_relaunched
+to_display c          # expect "3D" again
 adb logcat -d > out/logcat.txt
