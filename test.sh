@@ -10,8 +10,11 @@ keytool -genkeypair -keystore t.jks -storepass android -keypass android -alias t
 $BT/zipalign -f -p 4 apk/release/navit-android--release-signed.apk aligned.apk
 $BT/apksigner sign --ks t.jks --ks-pass pass:android --out navit.apk aligned.apk
 adb install -g navit.apk
-adb shell monkey -p $PKG -c android.intent.category.LAUNCHER 1
-sleep 30; shot launched
-adb shell input tap 540 1200; sleep 5; shot tap1
-sleep 5; shot tap1_later
+sleep 40   # let the launcher settle so it doesn't ANR over navit
+adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS
+launch(){ adb shell monkey -p $PKG -c android.intent.category.LAUNCHER 1; sleep 25; adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS; sleep 2; }
+tap(){ adb shell input tap $1 $2; sleep 4; shot $3; }
+launch; shot launched
+tap 889 1568 welcome_ok
+tap 540 1170 menu
 adb logcat -d > out/logcat.txt
