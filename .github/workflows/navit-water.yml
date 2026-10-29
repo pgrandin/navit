@@ -32,7 +32,7 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends \
             ca-certificates git build-essential cmake ninja-build pkg-config gettext \
-            libglib2.0-dev zlib1g-dev libprotobuf-c-dev protobuf-c-compiler python3 python3-shapely python3-pyshp
+            libglib2.0-dev zlib1g-dev liblzma-dev libprotobuf-c-dev protobuf-c-compiler python3 python3-shapely python3-pyshp
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
