@@ -1,0 +1,13 @@
+{
+  "command_status": 0,
+  "files": {
+    "evidence.json": "9be94541cf177d85f6982616a7278f5fee57ea34edad191aad95087653fbade5",
+    "findings.md": "d328307b3e84da7b1cc967f74772b594fbce92bb68d1ff52da840f7f6e942a49",
+    "reproduction.md": "20b915a416d8bb30c1c5c978fbfc79d08a277a43f23fcc09f7ab2652b09025be"
+  },
+  "issue": "https://github.com/navit-gps/navit/issues/629",
+  "run_id": "2026-10-29-glm-loader-review",
+  "schema": 1,
+  "source_sha": "ed10997cc2bcd6106e93eb1186b350c61cfab015",
+  "status": "complete"
+}

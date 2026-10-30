@@ -1,0 +1,17 @@
+{
+  "investigated_at": "2026-10-29",
+  "preserved_at": "2026-10-30",
+  "outcome": "no_source_patch_justified",
+  "model": "glm-5.3-flash-free",
+  "client": "plain Python chat-completions tool loop",
+  "review": "operator reviewed and corrected historical/packaging overclaims",
+  "runtime_statuses": {
+    "normal_runpath": 1,
+    "disabled_runpath": 127,
+    "library_path_control": 1
+  },
+  "limitations": [
+    "No actual distribution packaging pipeline tested",
+    "No successful interactive navigation claimed"
+  ]
+}
