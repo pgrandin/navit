@@ -1,0 +1,50 @@
+diff --git a/navit/speech/qt5_espeak/CMakeLists.txt b/navit/speech/qt5_espeak/CMakeLists.txt
+index b91c765..68075dc 100644
+--- a/navit/speech/qt5_espeak/CMakeLists.txt
++++ b/navit/speech/qt5_espeak/CMakeLists.txt
+@@ -3,6 +3,11 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
+ # Instruct CMake to run moc automatically when needed.
+ set(CMAKE_AUTOMOC ON)
+ 
++# espeak include dirs must be set before module_add_library() consumes ${speech_qt5_espeak_INCLUDES} (navit_macros.cmake:62)
++if(espeak_FOUND)
++	set(speech_qt5_espeak_INCLUDES "${espeak_INCLUDE_DIRS}")
++endif()
++
+ module_add_library(speech_qt5_espeak qt5_espeak.cpp Qt5EspeakAudioOut.cpp)
+ if(INTERNAL_ESPEAK_COMPLETE)
+ 	add_definitions ("-DINTERNAL_ESPEAK=1")
+diff --git a/cmake/Findespeak.cmake b/cmake/Findespeak.cmake
+new file mode 100644
+index 0000000..2423b8e
+--- /dev/null
++++ b/cmake/Findespeak.cmake
+@@ -0,0 +1,28 @@
++# Prototype Findespeak.cmake for navit issue #1663 (classic libespeak only,
++# not espeak-ng: navit's source includes <espeak/speak_lib.h> unconditionally,
++# see navit/speech/qt5_espeak/qt5_espeak.cpp:36 and the consumer at
++# CMakeLists.txt:444-456).
++#
++# Result variables:
++#   espeak_FOUND, espeak_INCLUDE_DIRS, espeak_LIBRARIES
++# Cache variables (also the standard entry points for custom installs):
++#   ESPEAK_INCLUDE_DIR, ESPEAK_LIBRARY
++
++find_path(ESPEAK_INCLUDE_DIR
++    NAMES espeak/speak_lib.h
++)
++find_library(ESPEAK_LIBRARY
++    NAMES espeak
++)
++
++include(FindPackageHandleStandardArgs)
++find_package_handle_standard_args(espeak
++    REQUIRED_VARS ESPEAK_LIBRARY ESPEAK_INCLUDE_DIR
++)
++
++mark_as_advanced(ESPEAK_INCLUDE_DIR ESPEAK_LIBRARY)
++
++if(ESPEAK_FOUND)
++    set(espeak_INCLUDE_DIRS "${ESPEAK_INCLUDE_DIR}")
++    set(espeak_LIBRARIES "${ESPEAK_LIBRARY}")
++endif()

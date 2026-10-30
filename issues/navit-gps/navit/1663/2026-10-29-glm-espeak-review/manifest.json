@@ -1,0 +1,14 @@
+{
+  "command_status": 0,
+  "files": {
+    "changes.patch": "03e42234d3e708c49dd5a6312eea70bdb9ccb77610069a1e7e4b9c3ed9f736fe",
+    "evidence.json": "cb22c0f1d298add49ef6fffc70ec662e65c656f22e341f0f226d773810cb0ad4",
+    "findings.md": "49327558115f3855e3a2db36a81eb89a8327dca02da1b1a178d673a9d9113e5a",
+    "reproduction.md": "d98385596dd3b057ebe3a350d94bc8a99c95cf1fac1831bc0df538c7558970eb"
+  },
+  "issue": "https://github.com/navit-gps/navit/issues/1663",
+  "run_id": "2026-10-29-glm-espeak-review",
+  "schema": 1,
+  "source_sha": "ed10997cc2bcd6106e93eb1186b350c61cfab015",
+  "status": "complete"
+}

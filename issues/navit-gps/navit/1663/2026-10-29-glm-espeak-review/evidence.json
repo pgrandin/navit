@@ -1,0 +1,18 @@
+{
+  "investigated_at": "2026-10-29",
+  "preserved_at": "2026-10-30",
+  "outcome": "prototype_requires_full_qt_build",
+  "model": "glm-5.3-flash-free",
+  "client": "native OpenCode 2.2.0",
+  "source_sha": "ed10997cc2bcd6106e93eb1186b350c61cfab015",
+  "focused_cases": [
+    "installed classic espeak",
+    "custom prefix with system runtime SONAME resolution",
+    "missing header isolated",
+    "missing library isolated"
+  ],
+  "limits": [
+    "Full Navit Qt5 build not exercised",
+    "Vendored fallback syntax-only check does not prove linking"
+  ]
+}
